@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>xdll</title>
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="logo">x</span><span>dll</span>
+    </div>
+    <nav id="views" class="nav"></nav>
+    <div class="section-head">
+      <span>Dossiers</span>
+      <button id="new-folder" class="icon-btn" title="Nouveau dossier" aria-label="Nouveau dossier"></button>
+    </div>
+    <nav id="folders" class="nav folders"></nav>
+    <div class="sidebar-foot" id="stats"></div>
+  </aside>
+
+  <main class="main">
+    <form id="add-form" class="add-bar">
+      <input id="add-url" type="text" autocomplete="off" spellcheck="false"
+             placeholder="Colle l'URL d'un post (x.com/…/status/…) — ou Ctrl+V n'importe où" />
+      <button type="submit" class="primary" id="add-btn">Télécharger</button>
+    </form>
+
+    <div class="toolbar">
+      <h1 id="title">Tout</h1>
+      <div class="spacer"></div>
+      <div class="search">
+        <input id="search" type="search" placeholder="Rechercher (texte, @auteur, note)" />
+      </div>
+      <div class="segmented" id="kind-filter" role="radiogroup" aria-label="Type">
+        <button data-kind="" class="on">Tout</button>
+        <button data-kind="image">Images</button>
+        <button data-kind="video">Vidéos</button>
+        <button data-kind="gif">GIF</button>
+      </div>
+      <select id="sort" aria-label="Trier">
+        <option value="added-desc">Ajout : récent d'abord</option>
+        <option value="added-asc">Ajout : ancien d'abord</option>
+        <option value="posted-desc">Post : récent d'abord</option>
+        <option value="posted-asc">Post : ancien d'abord</option>
+        <option value="author">Auteur A → Z</option>
+        <option value="size">Taille décroissante</option>
+      </select>
+      <input id="zoom" type="range" min="140" max="360" step="10" value="220" title="Taille des vignettes" aria-label="Taille des vignettes" />
+    </div>
+
+    <div id="selection-bar" class="selection-bar" hidden>
+      <span id="selection-count"></span>
+      <select id="selection-move" aria-label="Déplacer vers"></select>
+      <button id="selection-export">Exporter</button>
+      <button id="selection-delete" class="danger">Supprimer</button>
+      <div class="spacer"></div>
+      <button id="selection-clear" class="ghost">Annuler la sélection</button>
+    </div>
+
+    <section id="grid" class="grid"></section>
+    <div id="empty" class="empty" hidden></div>
+  </main>
+
+  <div id="viewer" class="viewer" hidden>
+    <div class="viewer-stage">
+      <button class="nav-btn prev" id="v-prev" aria-label="Précédent"></button>
+      <div id="v-media" class="viewer-media"></div>
+      <button class="nav-btn next" id="v-next" aria-label="Suivant"></button>
+      <div id="v-dots" class="dots"></div>
+    </div>
+    <aside class="viewer-side">
+      <div class="viewer-head">
+        <div>
+          <div id="v-name" class="v-name"></div>
+          <div id="v-handle" class="muted"></div>
+        </div>
+        <button class="icon-btn" id="v-close" aria-label="Fermer"></button>
+      </div>
+      <p id="v-text" class="v-text"></p>
+      <dl class="meta">
+        <dt>Posté</dt><dd id="v-posted"></dd>
+        <dt>Ajouté</dt><dd id="v-added"></dd>
+        <dt>Médias</dt><dd id="v-count"></dd>
+      </dl>
+      <label class="field">Dossier
+        <select id="v-folder"></select>
+      </label>
+      <label class="field">Note
+        <textarea id="v-note" rows="3" placeholder="Une note pour retrouver ce post…"></textarea>
+      </label>
+      <div class="v-actions">
+        <button id="v-fav"></button>
+        <button id="v-open">Ouvrir sur X</button>
+        <button id="v-reveal">Afficher dans l'explorateur</button>
+        <button id="v-file">Ouvrir le fichier</button>
+        <button id="v-export">Exporter…</button>
+        <button id="v-delete" class="danger">Supprimer</button>
+      </div>
+    </aside>
+  </div>
+
+  <div id="dialog" class="dialog" hidden>
+    <form id="dialog-form" class="dialog-card">
+      <h2 id="dialog-title"></h2>
+      <p id="dialog-text" class="muted"></p>
+      <input id="dialog-input" type="text" autocomplete="off" />
+      <div class="dialog-actions">
+        <button type="button" id="dialog-cancel" class="ghost">Annuler</button>
+        <button type="submit" id="dialog-ok" class="primary">OK</button>
+      </div>
+    </form>
+  </div>
+
+  <div id="menu" class="menu" hidden></div>
+  <div id="toasts" class="toasts"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
