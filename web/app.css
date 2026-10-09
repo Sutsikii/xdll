@@ -197,6 +197,8 @@ input { user-select: text; }
 .field select, .field textarea { color: var(--text); font-weight: 400; font-size: 14px; }
 .v-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .v-actions button { justify-content: center; }
+.v-actions .wide { grid-column: 1 / -1; }
+.copy-row { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; }
 #v-fav.on { color: var(--star); }
 .muted { color: var(--muted); }
 

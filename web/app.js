@@ -413,6 +413,13 @@ function cardMenu(b, x, y) {
   openMenu(x, y, [
     ...(many ? [] : [{ label: "Ouvrir", run: () => openViewer([b.id], 0) }, { label: "Ouvrir sur X", run: () => run(call("OpenPost", b.id)) }, { label: "Explorateur", run: () => call("Reveal", b.id) }]),
     { label: many ? `Exporter (${ids.length})` : "Exporter", run: () => exportIds(ids) },
+    ...(many
+      ? []
+      : [
+          { label: "Copier pour Claude", run: () => copyForClaude(b.id, 0, "all") },
+          { label: "Copier le texte", run: () => copyForClaude(b.id, 0, "text") },
+          { label: "Copier l'image", run: () => copyForClaude(b.id, 0, "image") },
+        ]),
     { label: "Copier le lien", run: () => copyLinks(ids) },
     "-",
     { label: "Non classés", run: () => run(call("Move", ids, ""), apply) },
@@ -441,6 +448,11 @@ function renderSelection() {
 function copyLinks(ids) {
   const urls = ids.map((id) => state.bookmarks.find((b) => b.id === id)?.url).filter(Boolean);
   navigator.clipboard.writeText(urls.join("\n")).then(() => toast(urls.length > 1 ? "Liens copiés" : "Lien copié"));
+}
+
+async function copyForClaude(id, index, what) {
+  const copied = await run(call("CopyForClaude", id, index, what));
+  if (copied) toast({ all: "Copié : texte + image", text: "Copié : texte", image: "Copié : image" }[copied]);
 }
 
 async function exportIds(ids) {
@@ -599,6 +611,9 @@ $("#v-fav").onclick = () => {
   run(call("SetFavorite", b.id, !b.favorite), apply);
 };
 $("#v-open").onclick = () => run(call("OpenPost", current().id));
+$("#v-claude").onclick = () => copyForClaude(current().id, state.viewer.media, "all");
+$("#v-claude-text").onclick = () => copyForClaude(current().id, state.viewer.media, "text");
+$("#v-claude-image").onclick = () => copyForClaude(current().id, state.viewer.media, "image");
 $("#v-reveal").onclick = () => call("Reveal", current().id);
 $("#v-file").onclick = () => run(call("OpenMedia", current().media[state.viewer.media].file));
 $("#v-export").onclick = () => exportIds([current().id]);
@@ -656,6 +671,10 @@ addEventListener("keydown", (e) => {
     else if (e.key === "ArrowLeft") step(-1);
     else if (e.key === "ArrowRight") step(1);
     else if (e.key.toLowerCase() === "f") $("#v-fav").click();
+    else if (e.ctrlKey || e.metaKey || e.altKey) return;
+    else if (e.key.toLowerCase() === "c") $("#v-claude").click();
+    else if (e.key.toLowerCase() === "t") $("#v-claude-text").click();
+    else if (e.key.toLowerCase() === "i") $("#v-claude-image").click();
     else if (e.key === "Delete") $("#v-delete").click();
     return;
   }
