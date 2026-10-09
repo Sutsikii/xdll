@@ -1,0 +1,361 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"slices"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/egoist/mygo"
+)
+
+// Media is a downloaded photo, video or GIF.
+type Media struct {
+	Kind   string `json:"kind"` // "image", "video" or "gif"
+	File   string `json:"file"` // relative to the media directory, e.g. "1234/1.mp4"
+	Thumb  string `json:"thumb,omitempty"`
+	Width  int    `json:"width,omitempty"`
+	Height int    `json:"height,omitempty"`
+	Size   int64  `json:"size"`
+}
+
+// Bookmark is a saved post and its media.
+type Bookmark struct {
+	ID         string    `json:"id"`
+	URL        string    `json:"url"`
+	Author     string    `json:"author"`
+	AuthorName string    `json:"authorName"`
+	Text       string    `json:"text"`
+	PostedAt   time.Time `json:"postedAt"`
+	AddedAt    time.Time `json:"addedAt"`
+	FolderID   string    `json:"folderId"` // "" when not filed
+	Favorite   bool      `json:"favorite"`
+	Note       string    `json:"note"`
+	Media      []Media   `json:"media"`
+}
+
+// Folder groups bookmarks.
+type Folder struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// Snapshot is the whole library.
+type Snapshot struct {
+	Folders   []Folder   `json:"folders"`
+	Bookmarks []Bookmark `json:"bookmarks"`
+}
+
+// Library keeps the bookmarks in library.json and their media next to it.
+type Library struct {
+	mu       sync.Mutex
+	dir      string
+	data     Snapshot
+	inflight map[string]bool
+}
+
+// OpenLibrary loads the library of dir, creating it if needed.
+func OpenLibrary(dir string) (*Library, error) {
+	l := &Library{dir: dir, inflight: map[string]bool{}}
+	if err := os.MkdirAll(l.mediaDir(), 0o755); err != nil {
+		return nil, err
+	}
+	b, err := os.ReadFile(l.file())
+	if errors.Is(err, os.ErrNotExist) {
+		return l, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(b, &l.data); err != nil {
+		return nil, fmt.Errorf("library.json : %w", err)
+	}
+	return l, nil
+}
+
+func (l *Library) file() string     { return filepath.Join(l.dir, "library.json") }
+func (l *Library) mediaDir() string { return filepath.Join(l.dir, "media") }
+
+// save writes the library; the caller holds l.mu.
+func (l *Library) save() error {
+	b, err := json.MarshalIndent(l.data, "", "  ")
+	if err != nil {
+		return err
+	}
+	tmp := l.file() + ".tmp"
+	if err := os.WriteFile(tmp, b, 0o644); err != nil {
+		return err
+	}
+	return os.Rename(tmp, l.file())
+}
+
+func (l *Library) snapshot() Snapshot {
+	return Snapshot{
+		Folders:   append([]Folder{}, l.data.Folders...),
+		Bookmarks: append([]Bookmark{}, l.data.Bookmarks...),
+	}
+}
+
+func (l *Library) find(id string) int {
+	return slices.IndexFunc(l.data.Bookmarks, func(b Bookmark) bool { return b.ID == id })
+}
+
+func (l *Library) hasFolder(id string) bool {
+	return id == "" || slices.ContainsFunc(l.data.Folders, func(f Folder) bool { return f.ID == id })
+}
+
+// update applies fn to a bookmark and saves.
+func (l *Library) update(id string, fn func(*Bookmark) error) (Snapshot, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	i := l.find(id)
+	if i < 0 {
+		return l.snapshot(), errors.New("ce post n'est plus dans la bibliothèque")
+	}
+	if err := fn(&l.data.Bookmarks[i]); err != nil {
+		return l.snapshot(), err
+	}
+	return l.snapshot(), l.save()
+}
+
+// List returns the folders and bookmarks.
+func (l *Library) List() Snapshot {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.snapshot()
+}
+
+// Add downloads the media of the post at url into folderID.
+func (l *Library) Add(ctx context.Context, url, folderID string) (Bookmark, error) {
+	id, err := parseTweetID(url)
+	if err != nil {
+		return Bookmark{}, err
+	}
+	l.mu.Lock()
+	switch {
+	case l.find(id) >= 0:
+		l.mu.Unlock()
+		return Bookmark{}, errors.New("ce post est déjà dans la bibliothèque")
+	case l.inflight[id]:
+		l.mu.Unlock()
+		return Bookmark{}, errors.New("ce post est déjà en cours de téléchargement")
+	}
+	l.inflight[id] = true
+	l.mu.Unlock()
+	defer func() {
+		l.mu.Lock()
+		delete(l.inflight, id)
+		l.mu.Unlock()
+	}()
+
+	t, err := fetchTweet(ctx, id)
+	if err != nil {
+		return Bookmark{}, err
+	}
+	if len(t.Media) == 0 {
+		return Bookmark{}, errors.New("ce post n'a ni image ni vidéo")
+	}
+	dir := filepath.Join(l.mediaDir(), id)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return Bookmark{}, err
+	}
+	b := Bookmark{
+		ID: id, URL: t.URL, Author: t.Author, AuthorName: t.AuthorName,
+		Text: t.Text, PostedAt: t.Created, AddedAt: time.Now().UTC(), FolderID: folderID,
+	}
+	for i, m := range t.Media {
+		name := strconv.Itoa(i+1) + extOf(m.URL, m.Kind)
+		n, err := download(ctx, m.URL, filepath.Join(dir, name))
+		if err != nil {
+			os.RemoveAll(dir)
+			return Bookmark{}, err
+		}
+		media := Media{Kind: m.Kind, File: id + "/" + name, Width: m.Width, Height: m.Height, Size: n}
+		if m.Thumb != "" {
+			thumb := strconv.Itoa(i+1) + ".thumb" + extOf(m.Thumb, "image")
+			if _, err := download(ctx, m.Thumb, filepath.Join(dir, thumb)); err == nil {
+				media.Thumb = id + "/" + thumb
+			}
+		}
+		b.Media = append(b.Media, media)
+	}
+
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if !l.hasFolder(b.FolderID) {
+		b.FolderID = "" // deleted meanwhile
+	}
+	l.data.Bookmarks = append(l.data.Bookmarks, b)
+	return b, l.save()
+}
+
+// Delete removes a bookmark and its files.
+func (l *Library) Delete(id string) (Snapshot, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if i := l.find(id); i >= 0 {
+		l.data.Bookmarks = slices.Delete(l.data.Bookmarks, i, i+1)
+		os.RemoveAll(filepath.Join(l.mediaDir(), id))
+	}
+	return l.snapshot(), l.save()
+}
+
+// Move files bookmarks into a folder ("" for none).
+func (l *Library) Move(ids []string, folderID string) (Snapshot, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if !l.hasFolder(folderID) {
+		return l.snapshot(), errors.New("ce dossier n'existe plus")
+	}
+	for i := range l.data.Bookmarks {
+		if slices.Contains(ids, l.data.Bookmarks[i].ID) {
+			l.data.Bookmarks[i].FolderID = folderID
+		}
+	}
+	return l.snapshot(), l.save()
+}
+
+// SetFavorite stars or unstars a bookmark.
+func (l *Library) SetFavorite(id string, favorite bool) (Snapshot, error) {
+	return l.update(id, func(b *Bookmark) error { b.Favorite = favorite; return nil })
+}
+
+// SetNote sets a bookmark's note.
+func (l *Library) SetNote(id, note string) (Snapshot, error) {
+	return l.update(id, func(b *Bookmark) error { b.Note = strings.TrimSpace(note); return nil })
+}
+
+// CreateFolder adds a folder.
+func (l *Library) CreateFolder(name string) (Folder, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return Folder{}, errors.New("donne un nom au dossier")
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	f := Folder{ID: strconv.FormatInt(time.Now().UnixNano(), 36), Name: name}
+	l.data.Folders = append(l.data.Folders, f)
+	return f, l.save()
+}
+
+// RenameFolder renames a folder.
+func (l *Library) RenameFolder(id, name string) (Snapshot, error) {
+	name = strings.TrimSpace(name)
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if name == "" {
+		return l.snapshot(), errors.New("donne un nom au dossier")
+	}
+	for i := range l.data.Folders {
+		if l.data.Folders[i].ID == id {
+			l.data.Folders[i].Name = name
+		}
+	}
+	return l.snapshot(), l.save()
+}
+
+// DeleteFolder removes a folder; its bookmarks become unfiled.
+func (l *Library) DeleteFolder(id string) (Snapshot, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.data.Folders = slices.DeleteFunc(l.data.Folders, func(f Folder) bool { return f.ID == id })
+	for i := range l.data.Bookmarks {
+		if l.data.Bookmarks[i].FolderID == id {
+			l.data.Bookmarks[i].FolderID = ""
+		}
+	}
+	return l.snapshot(), l.save()
+}
+
+// Export copies the media of bookmarks into a directory the user picks. It
+// returns how many files it copied, 0 when the user canceled.
+func (l *Library) Export(ctx context.Context, ids []string) (int, error) {
+	paths, err := mygo.Dialog.Open(mygo.OpenDialogOptions{
+		Parent:            mygo.CallerWindow(ctx),
+		Title:             "Exporter les médias",
+		ButtonLabel:       "Exporter ici",
+		Directory:         true,
+		CreateDirectories: true,
+	})
+	if err != nil || len(paths) == 0 {
+		return 0, err
+	}
+	l.mu.Lock()
+	var files []string
+	names := map[string]string{}
+	for _, b := range l.data.Bookmarks {
+		if !slices.Contains(ids, b.ID) {
+			continue
+		}
+		for i, m := range b.Media {
+			files = append(files, m.File)
+			names[m.File] = fmt.Sprintf("%s_%s_%d%s", cmpOr(b.Author, "x"), b.ID, i+1, filepath.Ext(m.File))
+		}
+	}
+	l.mu.Unlock()
+	for _, f := range files {
+		if err := copyFile(filepath.Join(l.mediaDir(), filepath.FromSlash(f)), filepath.Join(paths[0], names[f])); err != nil {
+			return 0, err
+		}
+	}
+	mygo.Shell.OpenPath(paths[0])
+	return len(files), nil
+}
+
+// Reveal shows a bookmark's files in the file manager.
+func (l *Library) Reveal(id string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if i := l.find(id); i >= 0 && len(l.data.Bookmarks[i].Media) > 0 {
+		mygo.Shell.ShowItemInFolder(filepath.Join(l.mediaDir(), filepath.FromSlash(l.data.Bookmarks[i].Media[0].File)))
+	}
+}
+
+// OpenPost opens the post in the browser.
+func (l *Library) OpenPost(id string) error {
+	l.mu.Lock()
+	i := l.find(id)
+	var u string
+	if i >= 0 {
+		u = l.data.Bookmarks[i].URL
+	}
+	l.mu.Unlock()
+	if u == "" {
+		return errors.New("post introuvable")
+	}
+	return mygo.Shell.OpenExternal(u)
+}
+
+// OpenMedia opens one media file with the default application.
+func (l *Library) OpenMedia(file string) error {
+	p := filepath.Join(l.mediaDir(), filepath.FromSlash(file))
+	if rel, err := filepath.Rel(l.mediaDir(), p); err != nil || strings.HasPrefix(rel, "..") {
+		return errors.New("chemin invalide")
+	}
+	return mygo.Shell.OpenPath(p)
+}
+
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(out, in); err != nil {
+		out.Close()
+		return err
+	}
+	return out.Close()
+}
