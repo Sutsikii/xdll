@@ -1,8 +1,4 @@
-// xdll downloads the photos and videos of Twitter/X posts and keeps them in
-// a library of bookmarks, sorted into folders.
-//
-//	go tool mygo dev     # run with live reload
-//	go tool mygo build   # build/windows-amd64/xdll.exe
+// xdll downloads the media of Twitter/X posts into a library.
 package main
 
 import (
@@ -21,7 +17,6 @@ var web embed.FS
 
 func main() {
 	app := mygo.App
-	// The name decides the user data directory, where the library lives.
 	app.SetName("xdll")
 
 	dir, err := app.Path(mygo.PathUserData)
@@ -34,8 +29,7 @@ func main() {
 	}
 	mygo.Bind(lib)
 
-	// The page and the downloaded media share one origin: /media/… are the
-	// files of the library, the rest is the page.
+	// /media/ serves the library files, everything else the page.
 	page, _ := fs.Sub(web, "web")
 	pages := mygo.FileServer(page)
 	media := http.StripPrefix("/media/", mygo.FileServer(os.DirFS(lib.mediaDir())))

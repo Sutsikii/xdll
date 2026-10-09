@@ -35,7 +35,7 @@ const state = {
   kind: "",
   sort: prefs.sort,
   selected: new Set(),
-  pending: [], // downloads in progress or failed: { key, url, error }
+  pending: [], // { key, url, error }
   viewer: null, // { ids, pos, media }
 };
 
@@ -68,7 +68,7 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "
 const mediaURL = (file) => "/media/" + file.split("/").map(encodeURIComponent).join("/");
 const folderName = (id) => state.folders.find((f) => f.id === id)?.name;
 const dateFmt = new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short" });
-const fmtDate = (s) => (s && !s.startsWith("0001") ? dateFmt.format(new Date(s)) : "—");
+const fmtDate = (s) => (s && !s.startsWith("0001") ? dateFmt.format(new Date(s)) : "-");
 const totalSize = (b) => b.media.reduce((n, m) => n + (m.size || 0), 0);
 function fmtSize(n) {
   if (n < 1024 * 1024) return Math.max(1, Math.round(n / 1024)) + " Ko";
@@ -94,8 +94,7 @@ async function run(promise, ok) {
   }
 }
 
-// prompt/confirm in the page's style. Resolves to the input (or true), or
-// null when canceled.
+// ask resolves to the input (or true), or null when canceled.
 function ask({ title, text = "", value = null, ok = "OK", danger = false }) {
   const dlg = $("#dialog");
   $("#dialog-title").textContent = title;
@@ -121,8 +120,7 @@ function ask({ title, text = "", value = null, ok = "OK", danger = false }) {
       done(value === null ? true : input.value);
     };
     $("#dialog-cancel").onclick = () => done(null);
-    // No expression bodies: an on… handler that returns false cancels the
-    // event, which would swallow every key typed into the input.
+    // Block bodies: an on* handler returning false cancels the event.
     dlg.onkeydown = (e) => {
       if (e.key === "Escape") {
         e.stopPropagation();
@@ -216,7 +214,6 @@ function navLink({ icon, label, count, on, onClick, folderId, onContext }) {
   a.onclick = onClick;
   if (onContext) a.oncontextmenu = (e) => (e.preventDefault(), onContext(e));
   if (folderId !== undefined) {
-    // A drop target for cards.
     a.ondragover = (e) => {
       if (!e.dataTransfer.types.includes("text/x-xdll")) return;
       e.preventDefault();
@@ -231,7 +228,7 @@ function navLink({ icon, label, count, on, onClick, folderId, onContext }) {
       if (ids.length)
         run(call("Move", ids, folderId), (s) => {
           apply(s);
-          toast(`${ids.length > 1 ? ids.length + " posts déplacés" : "Post déplacé"} vers « ${folderName(folderId) ?? "Non classés"} »`);
+          toast(`Déplacé dans ${folderName(folderId) ?? "Non classés"}`);
         });
     };
   }
@@ -269,7 +266,7 @@ function renderSidebar() {
     ),
   );
   if (!state.folders.length) {
-    folders.innerHTML = `<div class="hint">Crée des dossiers avec + puis glisse les posts dessus pour les ranger.</div>`;
+    folders.innerHTML = `<div class="hint">Aucun dossier</div>`;
   }
   const size = state.bookmarks.reduce((s, b) => s + totalSize(b), 0);
   const media = state.bookmarks.reduce((s, b) => s + b.media.length, 0);
@@ -279,8 +276,8 @@ function renderSidebar() {
 
 function folderMenu(f, x, y) {
   openMenu(x, y, [
-    { label: "Renommer…", run: () => renameFolder(f) },
-    { label: "Exporter le dossier…", run: () => exportIds(state.bookmarks.filter((b) => b.folderId === f.id).map((b) => b.id)) },
+    { label: "Renommer", run: () => renameFolder(f) },
+    { label: "Exporter", run: () => exportIds(state.bookmarks.filter((b) => b.folderId === f.id).map((b) => b.id)) },
     "-",
     { label: "Supprimer le dossier", danger: true, run: () => deleteFolder(f) },
   ]);
@@ -291,7 +288,6 @@ async function newFolder() {
   if (name === null) return;
   const f = await run(call("CreateFolder", name));
   if (!f) return;
-  // Move the selection into it, if any.
   if (state.selected.size) await run(call("Move", [...state.selected], f.id), apply);
   else apply(await call("List"));
   setView({ type: "folder", id: f.id });
@@ -306,7 +302,7 @@ async function deleteFolder(f) {
   const count = state.bookmarks.filter((b) => b.folderId === f.id).length;
   const ok = await ask({
     title: `Supprimer « ${f.name} » ?`,
-    text: count ? `Ses ${count} post(s) ne seront pas supprimés : ils iront dans « Non classés ».` : "",
+    text: count ? `${count} post(s) iront dans Non classés.` : "",
     ok: "Supprimer",
     danger: true,
   });
@@ -341,9 +337,8 @@ function renderGrid() {
     const el = document.createElement("div");
     el.className = "card pending" + (p.error ? " failed" : "");
     el.innerHTML = `<div class="thumb">${p.error ? esc(p.error) : ""}</div>
-      <div class="info"><div class="author"><b>${p.error ? "Échec" : "Téléchargement…"}</b></div><div class="snippet">${esc(p.url)}</div></div>`;
+      <div class="info"><div class="author"><b>${p.error ? "Échec" : "Téléchargement"}</b></div><div class="snippet">${esc(p.url)}</div></div>`;
     if (p.error) {
-      el.title = "Clique pour fermer";
       el.style.cursor = "pointer";
       el.onclick = () => {
         state.pending = state.pending.filter((x) => x !== p);
@@ -407,8 +402,8 @@ function renderGrid() {
   grid.hidden = cards.length === 0;
   if (!cards.length) {
     empty.innerHTML = state.bookmarks.length
-      ? `<b>Rien ici</b><span>Aucun post ne correspond à ce filtre.</span>`
-      : `<b>Ta bibliothèque est vide</b><span>Colle l'URL d'un post X/Twitter en haut pour télécharger ses images et vidéos.</span>`;
+      ? `<b>Aucun résultat</b>`
+      : `<b>Aucun post</b>`;
   }
 }
 
@@ -416,14 +411,14 @@ function cardMenu(b, x, y) {
   const ids = state.selected.has(b.id) ? [...state.selected] : [b.id];
   const many = ids.length > 1;
   openMenu(x, y, [
-    ...(many ? [] : [{ label: "Ouvrir", run: () => openViewer([b.id], 0) }, { label: "Ouvrir sur X", run: () => run(call("OpenPost", b.id)) }, { label: "Afficher dans l'explorateur", run: () => call("Reveal", b.id) }]),
-    { label: many ? `Exporter ${ids.length} posts…` : "Exporter…", run: () => exportIds(ids) },
+    ...(many ? [] : [{ label: "Ouvrir", run: () => openViewer([b.id], 0) }, { label: "Ouvrir sur X", run: () => run(call("OpenPost", b.id)) }, { label: "Explorateur", run: () => call("Reveal", b.id) }]),
+    { label: many ? `Exporter (${ids.length})` : "Exporter", run: () => exportIds(ids) },
     { label: "Copier le lien", run: () => copyLinks(ids) },
     "-",
     { label: "Non classés", run: () => run(call("Move", ids, ""), apply) },
-    ...state.folders.map((f) => ({ label: "→ " + f.name, run: () => run(call("Move", ids, f.id), apply) })),
+    ...state.folders.map((f) => ({ label: f.name, run: () => run(call("Move", ids, f.id), apply) })),
     "-",
-    { label: many ? `Supprimer ${ids.length} posts` : "Supprimer", danger: true, run: () => deleteIds(ids) },
+    { label: many ? `Supprimer (${ids.length})` : "Supprimer", danger: true, run: () => deleteIds(ids) },
   ]);
 }
 
@@ -438,9 +433,9 @@ function renderSelection() {
   if (!n) return;
   $("#selection-count").textContent = `${n} sélectionné${n > 1 ? "s" : ""}`;
   const sel = $("#selection-move");
-  sel.innerHTML = `<option value="" disabled selected>Déplacer vers…</option><option value="__none">Non classés</option>` +
+  sel.innerHTML = `<option value="" disabled selected>Déplacer</option><option value="__none">Non classés</option>` +
     state.folders.map((f) => `<option value="${esc(f.id)}">${esc(f.name)}</option>`).join("") +
-    `<option value="__new">+ Nouveau dossier…</option>`;
+    `<option value="__new">Nouveau dossier</option>`;
 }
 
 function copyLinks(ids) {
@@ -457,7 +452,6 @@ async function exportIds(ids) {
 async function deleteIds(ids) {
   const ok = await ask({
     title: ids.length > 1 ? `Supprimer ${ids.length} posts ?` : "Supprimer ce post ?",
-    text: "Les images et vidéos téléchargées seront effacées.",
     ok: "Supprimer",
     danger: true,
   });
@@ -484,7 +478,7 @@ async function add(url) {
     state.pending = state.pending.filter((x) => x !== p);
     if (state.view.type === "fav") await call("SetFavorite", b.id, true);
     apply(await call("List"));
-    toast(`${b.media.length} média${b.media.length > 1 ? "s" : ""} de @${b.author} téléchargé${b.media.length > 1 ? "s" : ""}`);
+    toast(`@${b.author} : ${b.media.length} média${b.media.length > 1 ? "s" : ""}`);
   } catch (e) {
     p.error = errText(e);
     renderGrid();
@@ -494,13 +488,12 @@ async function add(url) {
 $("#add-form").onsubmit = (e) => {
   e.preventDefault();
   const input = $("#add-url");
-  // Several URLs at once, one per line or separated by spaces.
   const urls = input.value.split(/\s+/).filter(Boolean);
   input.value = "";
   urls.forEach(add);
 };
 
-// Ctrl+V anywhere outside a text field adds the post on the clipboard.
+// Ctrl+V outside a text field.
 addEventListener("paste", (e) => {
   if (e.target.closest("input, textarea")) return;
   const text = e.clipboardData.getData("text");
@@ -510,7 +503,7 @@ addEventListener("paste", (e) => {
   }
 });
 
-// Links dragged from the browser onto the window.
+// Links dropped from the browser.
 addEventListener("dragover", (e) => {
   if (e.dataTransfer.types.includes("text/uri-list") || (e.dataTransfer.types.includes("text/plain") && !e.dataTransfer.types.includes("text/x-xdll"))) e.preventDefault();
 });
@@ -542,7 +535,7 @@ function current() {
   return v && state.bookmarks.find((b) => b.id === v.ids[v.pos]);
 }
 
-let shown = ""; // the media on screen, so that re-rendering keeps a playing video
+let shown = ""; // keeps a playing video across renders
 function renderViewer() {
   const b = current();
   if (!b) return closeViewer();

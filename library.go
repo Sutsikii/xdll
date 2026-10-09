@@ -54,7 +54,7 @@ type Snapshot struct {
 	Bookmarks []Bookmark `json:"bookmarks"`
 }
 
-// Library keeps the bookmarks in library.json and their media next to it.
+// Library stores bookmarks in library.json and media in media/.
 type Library struct {
 	mu       sync.Mutex
 	dir      string
@@ -62,7 +62,7 @@ type Library struct {
 	inflight map[string]bool
 }
 
-// OpenLibrary loads the library of dir, creating it if needed.
+// OpenLibrary loads or creates the library in dir.
 func OpenLibrary(dir string) (*Library, error) {
 	l := &Library{dir: dir, inflight: map[string]bool{}}
 	if err := os.MkdirAll(l.mediaDir(), 0o755); err != nil {
@@ -118,7 +118,7 @@ func (l *Library) update(id string, fn func(*Bookmark) error) (Snapshot, error) 
 	defer l.mu.Unlock()
 	i := l.find(id)
 	if i < 0 {
-		return l.snapshot(), errors.New("ce post n'est plus dans la bibliothèque")
+		return l.snapshot(), errors.New("post introuvable")
 	}
 	if err := fn(&l.data.Bookmarks[i]); err != nil {
 		return l.snapshot(), err
@@ -143,10 +143,10 @@ func (l *Library) Add(ctx context.Context, url, folderID string) (Bookmark, erro
 	switch {
 	case l.find(id) >= 0:
 		l.mu.Unlock()
-		return Bookmark{}, errors.New("ce post est déjà dans la bibliothèque")
+		return Bookmark{}, errors.New("déjà enregistré")
 	case l.inflight[id]:
 		l.mu.Unlock()
-		return Bookmark{}, errors.New("ce post est déjà en cours de téléchargement")
+		return Bookmark{}, errors.New("déjà en cours")
 	}
 	l.inflight[id] = true
 	l.mu.Unlock()
@@ -161,7 +161,7 @@ func (l *Library) Add(ctx context.Context, url, folderID string) (Bookmark, erro
 		return Bookmark{}, err
 	}
 	if len(t.Media) == 0 {
-		return Bookmark{}, errors.New("ce post n'a ni image ni vidéo")
+		return Bookmark{}, errors.New("aucun média")
 	}
 	dir := filepath.Join(l.mediaDir(), id)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -191,7 +191,7 @@ func (l *Library) Add(ctx context.Context, url, folderID string) (Bookmark, erro
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if !l.hasFolder(b.FolderID) {
-		b.FolderID = "" // deleted meanwhile
+		b.FolderID = ""
 	}
 	l.data.Bookmarks = append(l.data.Bookmarks, b)
 	return b, l.save()
@@ -213,7 +213,7 @@ func (l *Library) Move(ids []string, folderID string) (Snapshot, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if !l.hasFolder(folderID) {
-		return l.snapshot(), errors.New("ce dossier n'existe plus")
+		return l.snapshot(), errors.New("dossier introuvable")
 	}
 	for i := range l.data.Bookmarks {
 		if slices.Contains(ids, l.data.Bookmarks[i].ID) {
@@ -237,7 +237,7 @@ func (l *Library) SetNote(id, note string) (Snapshot, error) {
 func (l *Library) CreateFolder(name string) (Folder, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return Folder{}, errors.New("donne un nom au dossier")
+		return Folder{}, errors.New("nom vide")
 	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -252,7 +252,7 @@ func (l *Library) RenameFolder(id, name string) (Snapshot, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if name == "" {
-		return l.snapshot(), errors.New("donne un nom au dossier")
+		return l.snapshot(), errors.New("nom vide")
 	}
 	for i := range l.data.Folders {
 		if l.data.Folders[i].ID == id {
@@ -275,12 +275,11 @@ func (l *Library) DeleteFolder(id string) (Snapshot, error) {
 	return l.snapshot(), l.save()
 }
 
-// Export copies the media of bookmarks into a directory the user picks. It
-// returns how many files it copied, 0 when the user canceled.
+// Export copies media to a chosen directory and returns the file count.
 func (l *Library) Export(ctx context.Context, ids []string) (int, error) {
 	paths, err := mygo.Dialog.Open(mygo.OpenDialogOptions{
 		Parent:            mygo.CallerWindow(ctx),
-		Title:             "Exporter les médias",
+		Title:             "Exporter",
 		ButtonLabel:       "Exporter ici",
 		Directory:         true,
 		CreateDirectories: true,
@@ -310,7 +309,7 @@ func (l *Library) Export(ctx context.Context, ids []string) (int, error) {
 	return len(files), nil
 }
 
-// Reveal shows a bookmark's files in the file manager.
+// Reveal shows a bookmark's files in the explorer.
 func (l *Library) Reveal(id string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -334,7 +333,7 @@ func (l *Library) OpenPost(id string) error {
 	return mygo.Shell.OpenExternal(u)
 }
 
-// OpenMedia opens one media file with the default application.
+// OpenMedia opens a media file.
 func (l *Library) OpenMedia(file string) error {
 	p := filepath.Join(l.mediaDir(), filepath.FromSlash(file))
 	if rel, err := filepath.Rel(l.mediaDir(), p); err != nil || strings.HasPrefix(rel, "..") {

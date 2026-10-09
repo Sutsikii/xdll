@@ -18,7 +18,7 @@ import (
 	"time"
 )
 
-// tweet is what a post is made of, as the public APIs describe it.
+// tweet is a post as the public APIs describe it.
 type tweet struct {
 	ID         string
 	URL        string
@@ -29,7 +29,7 @@ type tweet struct {
 	Media      []remoteMedia
 }
 
-// remoteMedia is one photo, video or GIF of a post, before it is downloaded.
+// remoteMedia is a photo, video or GIF not downloaded yet.
 type remoteMedia struct {
 	Kind   string // "image", "video" or "gif"
 	URL    string // the best quality file
@@ -40,12 +40,11 @@ type remoteMedia struct {
 
 var statusID = regexp.MustCompile(`(?i)/status(?:es)?/(\d+)`)
 
-// parseTweetID accepts a post's URL (twitter.com, x.com, fxtwitter, vxtwitter…)
-// or its numeric ID.
+// parseTweetID takes a post URL or ID.
 func parseTweetID(s string) (string, error) {
 	s = strings.TrimSpace(s)
 	if s == "" {
-		return "", errors.New("colle l'URL d'un post")
+		return "", errors.New("URL vide")
 	}
 	if _, err := strconv.ParseUint(s, 10, 64); err == nil {
 		return s, nil
@@ -53,7 +52,7 @@ func parseTweetID(s string) (string, error) {
 	if m := statusID.FindStringSubmatch(s); m != nil {
 		return m[1], nil
 	}
-	return "", fmt.Errorf("ce n'est pas l'URL d'un post Twitter/X : %q", s)
+	return "", errors.New("URL invalide")
 }
 
 var client = &http.Client{Timeout: 30 * time.Second}
@@ -77,8 +76,7 @@ func getJSON(ctx context.Context, u string, v any) error {
 	return json.NewDecoder(res.Body).Decode(v)
 }
 
-// fetchTweet asks the syndication API (the one embedded posts use), then
-// FxTwitter's, which also knows posts the first one does not.
+// fetchTweet tries the syndication API, then FxTwitter.
 func fetchTweet(ctx context.Context, id string) (*tweet, error) {
 	t, err := fetchSyndication(ctx, id)
 	if err == nil && len(t.Media) > 0 {
@@ -94,7 +92,7 @@ func fetchTweet(ctx context.Context, id string) (*tweet, error) {
 	return nil, fmt.Errorf("post introuvable (%v ; %v)", err, err2)
 }
 
-// syndicationToken is the token embedded posts send along with the ID.
+// syndicationToken is the token embeds send with the ID.
 func syndicationToken(id string) string {
 	n, _ := strconv.ParseFloat(id, 64)
 	x := n / 1e15 * math.Pi
@@ -242,8 +240,7 @@ func fetchFx(ctx context.Context, id string) (*tweet, error) {
 	return t, nil
 }
 
-// originalPhoto turns https://pbs.twimg.com/media/X.jpg into the URL of
-// the photo at its original size.
+// originalPhoto returns the original size URL of a photo.
 func originalPhoto(u string) string {
 	p, err := url.Parse(u)
 	if err != nil || p.Host != "pbs.twimg.com" {
@@ -266,15 +263,14 @@ func postURL(t *tweet) string {
 	return "https://x.com/" + cmpOr(t.Author, "i") + "/status/" + t.ID
 }
 
-// download writes u to dst, through a temporary file so that a canceled
-// download leaves nothing behind.
+// download writes u to dst through a temporary file.
 func download(ctx context.Context, u, dst string) (int64, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
 		return 0, err
 	}
 	req.Header.Set("User-Agent", userAgent)
-	dl := &http.Client{} // no timeout: videos can be large
+	dl := &http.Client{} // no timeout for large videos
 	res, err := dl.Do(req)
 	if err != nil {
 		return 0, err
@@ -301,7 +297,7 @@ func download(ctx context.Context, u, dst string) (int64, error) {
 	return n, nil
 }
 
-// extOf picks a file extension for a media URL.
+// extOf returns the file extension of a media URL.
 func extOf(u, kind string) string {
 	p, err := url.Parse(u)
 	if err == nil {
