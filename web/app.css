@@ -61,8 +61,8 @@ input { user-select: text; }
   background: var(--sidebar); border-right: 1px solid var(--line);
   padding: 14px 10px; min-height: 0;
 }
-.brand { display: flex; align-items: center; gap: 2px; font-size: 20px; font-weight: 700; padding: 4px 8px 14px; letter-spacing: -.02em; }
-.logo { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 7px; background: var(--text); color: var(--bg); margin-right: 6px; font-size: 17px; }
+.brand { display: flex; align-items: center; gap: 0; font-size: 20px; font-weight: 700; padding: 4px 8px 14px; letter-spacing: -.02em; }
+.logo { width: 28px; height: 28px; margin-right: 8px; }
 .nav { display: flex; flex-direction: column; gap: 1px; }
 .nav a {
   display: flex; align-items: center; gap: 9px;
