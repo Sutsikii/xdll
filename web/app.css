@@ -223,4 +223,5 @@ input { user-select: text; }
   animation: rise .18s ease;
 }
 .toast.error { background: var(--danger); color: #fff; }
+.toast.action { cursor: pointer; }
 @keyframes rise { from { transform: translateY(8px); opacity: 0; } }

@@ -35,7 +35,7 @@ const state = {
   kind: "",
   sort: prefs.sort,
   selected: new Set(),
-  pending: [], // { key, url, error }
+  pending: [], // { key, url, id, error }
   viewer: null, // { ids, pos, media }
 };
 
@@ -76,10 +76,11 @@ function fmtSize(n) {
   return (n / 1024 / 1024 / 1024).toFixed(2) + " Go";
 }
 
-function toast(text, error = false) {
+function toast(text, error = false, onclick = null) {
   const el = document.createElement("div");
-  el.className = "toast" + (error ? " error" : "");
+  el.className = "toast" + (error ? " error" : "") + (onclick ? " action" : "");
   el.textContent = text;
+  if (onclick) el.onclick = () => (el.remove(), onclick());
   $("#toasts").append(el);
   setTimeout(() => el.remove(), error ? 6000 : 3000);
 }
@@ -477,12 +478,20 @@ async function deleteIds(ids) {
 // --- Adding -------------------------------------------------------------------
 
 const looksLikePost = (s) => /\/status(es)?\/\d+/i.test(s) || /^\d{6,}$/.test(s.trim());
+const postID = (s) => s.match(/\/status(?:es)?\/(\d+)/i)?.[1] ?? (/^\d+$/.test(s) ? s : null);
 
 async function add(url) {
   url = url.trim();
   if (!url) return;
+  const id = postID(url);
+  const dup = state.bookmarks.find((b) => b.id === id);
+  if (dup) {
+    const where = dup.folderId ? folderName(dup.folderId) : "Non classés";
+    return toast(`Déjà enregistré : @${dup.author} (${where}). Cliquer pour l'ouvrir`, true, () => openViewer([dup.id], 0));
+  }
+  if (id && state.pending.some((p) => p.id === id && !p.error)) return toast("Déjà en cours de téléchargement", true);
   const folderId = state.view.type === "folder" ? state.view.id : "";
-  const p = { key: Math.random(), url };
+  const p = { key: Math.random(), url, id };
   state.pending.unshift(p);
   renderGrid();
   try {
