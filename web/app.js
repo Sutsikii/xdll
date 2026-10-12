@@ -644,13 +644,25 @@ async function openSettings() {
     $("#data-dir").textContent = info.dir;
     $("#data-version").textContent = info.version || "dev";
   }
+  showUpdates(await run(call("Updates")));
 }
+
+function showUpdates(u) {
+  if (!u) return;
+  $("#update-off").hidden = u.enabled;
+  for (const el of [$("#auto-check"), $("#auto-install"), $("#check-updates")]) el.disabled = !u.enabled;
+  $("#auto-check").checked = u.automaticChecks;
+  $("#auto-install").checked = u.automaticDownloads;
+  $("#last-check").textContent = u.lastCheck && !u.lastCheck.startsWith("0001") ? "Dernière vérification : " + fmtDate(u.lastCheck) : "";
+}
+
+const setUpdates = () => run(call("SetUpdates", $("#auto-check").checked, $("#auto-install").checked), showUpdates);
 
 const closeSettings = () => ($("#settings").hidden = true);
 
 // busy disables the settings buttons while fn runs.
 async function busy(btn, label, fn) {
-  const buttons = [...$("#settings").querySelectorAll(".settings-row button")];
+  const buttons = [...$("#settings").querySelectorAll(".settings-row button:not(:disabled)")];
   const text = btn.textContent;
   buttons.forEach((b) => (b.disabled = true));
   btn.textContent = label;
@@ -711,6 +723,9 @@ $("#settings").onmousedown = (e) => e.target === e.currentTarget && closeSetting
 $("#backup").onclick = backup;
 $("#restore-merge").onclick = () => restore(false);
 $("#restore-replace").onclick = () => restore(true);
+$("#auto-check").onchange = setUpdates;
+$("#auto-install").onchange = setUpdates;
+$("#check-updates").onclick = () => call("CheckForUpdates");
 $("#open-data-dir").onclick = () => run(call("OpenDataDir"));
 
 // --- Toolbar and keyboard ----------------------------------------------------------

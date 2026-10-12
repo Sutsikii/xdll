@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/egoist/mygo"
+	"github.com/egoist/mygo/plugins/updater"
 )
 
 //go:embed all:web
@@ -18,6 +19,7 @@ var web embed.FS
 func main() {
 	app := mygo.App
 	app.SetName("xdll")
+	mygo.Use(updater.Plugin)
 
 	dir, err := app.Path(mygo.PathUserData)
 	if err != nil {

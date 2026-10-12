@@ -29,6 +29,10 @@ Tout est dans `%APPDATA%\xdll` :
 2. Copier le `.zip` sur le nouveau PC.
 3. Installer xdll, Paramètres → **Remplacer** (ou **Fusionner** pour ajouter seulement les posts absents).
 
+## Mises à jour
+
+L'app se met à jour toute seule depuis les [releases GitHub](https://github.com/Sutsikii/xdll/releases) : une vérification par jour, avec une fenêtre qui propose d'installer. Dans Paramètres : vérifier maintenant, désactiver la vérification, ou installer sans demander.
+
 ## Raccourcis
 
 | Touche | Action |
@@ -55,6 +59,15 @@ XDLL_NET=1 go test ./...   # avec de vrais téléchargements
 XDLL_CLIP=1 go test -run Clipboard .   # vrai presse-papier (Windows)
 ```
 
+### Publier une version
+
+1. Changer `version` dans `mygo.json` et ajouter sa section dans `CHANGELOG.md` (affichée dans la fenêtre de mise à jour).
+2. Commit, puis `git tag v0.3.0 && git push origin main v0.3.0`.
+
+Le workflow `Release` teste, build l'installateur signé et publie la release : les apps installées la proposent dans la journée.
+
+La clé qui signe les mises à jour est dans `%APPDATA%\mygo\update-keys\mygo-update.key` et dans le secret `MYGO_UPDATER_PRIVATE_KEY` du dépôt. Sans elle, les apps installées ne peuvent plus être mises à jour : la garder aussi dans un gestionnaire de mots de passe.
+
 ## Structure
 
 | Fichier | Rôle |
@@ -64,6 +77,7 @@ XDLL_CLIP=1 go test -run Clipboard .   # vrai presse-papier (Windows)
 | `library.go` | bibliothèque : posts, dossiers, export |
 | `claude.go` | copie pour Claude (texte + image) |
 | `backup.go` | sauvegarde et import (.zip) |
+| `update.go` | réglages des mises à jour |
 | `web/` | interface (HTML, CSS, JS sans build) |
 
 ## Limites

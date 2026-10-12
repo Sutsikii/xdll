@@ -143,6 +143,17 @@
       </section>
 
       <section>
+        <h3>Mises à jour</h3>
+        <p id="update-off" class="muted" hidden>Indisponibles dans cette version de développement.</p>
+        <label class="check-row"><input type="checkbox" id="auto-check" /> Vérifier automatiquement (une fois par jour)</label>
+        <label class="check-row"><input type="checkbox" id="auto-install" /> Installer sans demander</label>
+        <div class="settings-row">
+          <button id="check-updates">Rechercher des mises à jour</button>
+          <span id="last-check" class="muted small"></span>
+        </div>
+      </section>
+
+      <section>
         <h3>Données</h3>
         <dl class="meta">
           <dt>Dossier</dt><dd><span id="data-dir" class="path"></span></dd>
