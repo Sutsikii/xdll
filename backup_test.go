@@ -69,10 +69,10 @@ func TestBackupRestore(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(dst.mediaDir(), "3")); !os.IsNotExist(err) {
 		t.Error("replace kept the media of post 3")
 	}
-	if _, err := os.Stat(filepath.Join(dst.dir, "media.old")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(dst.root(), "media.old")); !os.IsNotExist(err) {
 		t.Error("media.old left behind")
 	}
-	re, err := OpenLibrary(dst.dir)
+	re, err := OpenLibrary(dst.root())
 	if err != nil || len(re.List().Bookmarks) != 2 || re.List().Bookmarks[0].FolderID != re.List().Folders[0].ID {
 		t.Fatalf("reload: %+v %v", re.List(), err)
 	}

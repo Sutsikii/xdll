@@ -24,6 +24,9 @@ import (
 // Settings is what the settings page shows.
 type Settings struct {
 	Dir     string `json:"dir"`
+	Default bool   `json:"default"` // Dir is the app's data directory
+	Home    string `json:"home"`    // the app's data directory
+	Missing string `json:"missing"` // the chosen directory, not found at launch
 	Version string `json:"version"`
 }
 
@@ -44,12 +47,14 @@ type RestoreResult struct {
 
 // Settings returns the data directory and the app version.
 func (l *Library) Settings() Settings {
-	return Settings{Dir: l.dir, Version: mygo.App.Version()}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.settings()
 }
 
 // OpenDataDir opens the data directory in the explorer.
 func (l *Library) OpenDataDir() error {
-	return mygo.Shell.OpenPath(l.dir)
+	return mygo.Shell.OpenPath(l.root())
 }
 
 // Backup asks where to save and writes the whole library to a zip. prefs is
@@ -190,7 +195,7 @@ func (l *Library) restore(file string, replace bool) (RestoreResult, error) {
 	}
 	l.mu.Unlock()
 
-	staging := filepath.Join(l.dir, "import.tmp")
+	staging := filepath.Join(l.root(), "import.tmp")
 	os.RemoveAll(staging)
 	defer os.RemoveAll(staging)
 	for _, b := range todo {
@@ -211,7 +216,7 @@ func (l *Library) restore(file string, replace bool) (RestoreResult, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	prev := l.data
-	old := filepath.Join(l.dir, "media.old")
+	old := filepath.Join(l.root(), "media.old")
 	if replace {
 		os.RemoveAll(old)
 		if err := os.Rename(l.mediaDir(), old); err != nil {

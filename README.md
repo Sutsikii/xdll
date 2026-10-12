@@ -18,10 +18,12 @@ Les médias restent sur le PC, même si le post est supprimé de X.
 
 ## Données
 
-Tout est dans `%APPDATA%\xdll` :
+Par défaut tout est dans `%APPDATA%\xdll` :
 
 - `library.json` : posts, dossiers, favoris, notes
 - `media\<id du post>\` : les fichiers
+
+Paramètres → Données → **Changer de dossier** déplace `library.json` et `media` ailleurs (autre disque, dossier synchronisé…). Si le dossier choisi contient déjà une bibliothèque xdll, elle est utilisée telle quelle. Le chemin choisi est retenu dans `%APPDATA%\xdll\data.json` ; s'il est introuvable au lancement (disque débranché), l'app le signale et utilise le dossier par défaut en attendant.
 
 ## Changer de PC
 
@@ -78,6 +80,7 @@ La clé qui signe les mises à jour est dans `%APPDATA%\mygo\update-keys\mygo-up
 | `claude.go` | copie pour Claude (texte + image) |
 | `backup.go` | sauvegarde et import (.zip) |
 | `update.go` | réglages des mises à jour |
+| `datadir.go` | choix du dossier des données |
 | `web/` | interface (HTML, CSS, JS sans build) |
 
 ## Limites

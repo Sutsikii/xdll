@@ -639,12 +639,36 @@ async function openSettings() {
   $("#settings").hidden = false;
   $("#data-stats").textContent = statsText();
   $("#settings-close").focus();
-  const info = await run(call("Settings"));
-  if (info) {
-    $("#data-dir").textContent = info.dir;
-    $("#data-version").textContent = info.version || "dev";
-  }
+  showSettings(await run(call("Settings")));
   showUpdates(await run(call("Updates")));
+}
+
+function showSettings(info) {
+  if (!info) return;
+  $("#data-dir").textContent = info.dir;
+  $("#data-version").textContent = info.version || "dev";
+  $("#reset-data-dir").hidden = info.default;
+  $("#data-missing").hidden = !info.missing;
+  $("#data-missing").textContent = `Dossier introuvable : ${info.missing}. Le dossier par défaut est utilisé en attendant (disque débranché ?).`;
+}
+
+// moveData moves the library to c.dir, or switches to the library there.
+async function moveData(c) {
+  if (!c?.dir) return;
+  const ok = await ask(
+    c.hasLibrary
+      ? { title: "Utiliser la bibliothèque de ce dossier ?", text: `${c.dir} contient déjà une bibliothèque xdll. L'actuelle reste où elle est.`, ok: "Utiliser" }
+      : { title: "Déplacer les données ?", text: `${statsText()} vont être déplacés vers ${c.dir}.`, ok: "Déplacer" },
+  );
+  if (!ok) return;
+  await busy($("#change-data-dir"), c.hasLibrary ? "Changement…" : "Déplacement…", async () => {
+    const s = await run(call(c.hasLibrary ? "UseData" : "MoveData", c.dir));
+    if (!s) return;
+    showSettings(s);
+    apply(await call("List"));
+    $("#data-stats").textContent = statsText();
+    toast("Données dans " + s.dir);
+  });
 }
 
 function showUpdates(u) {
@@ -726,6 +750,8 @@ $("#restore-replace").onclick = () => restore(true);
 $("#auto-check").onchange = setUpdates;
 $("#auto-install").onchange = setUpdates;
 $("#check-updates").onclick = () => call("CheckForUpdates");
+$("#change-data-dir").onclick = async () => moveData(await run(call("ChooseDataDir")));
+$("#reset-data-dir").onclick = async () => moveData(await run(call("DefaultDataDir")));
 $("#open-data-dir").onclick = () => run(call("OpenDataDir"));
 
 // --- Toolbar and keyboard ----------------------------------------------------------
@@ -816,4 +842,5 @@ addEventListener("keydown", (e) => {
 // --- Start -------------------------------------------------------------------------
 
 call("List").then(apply, (e) => toast(errText(e), true));
+call("Settings").then((s) => s.missing && toast(`Dossier des données introuvable : ${s.missing}. Voir Paramètres`, true, openSettings));
 $("#add-url").focus();

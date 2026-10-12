@@ -25,7 +25,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	lib, err := OpenLibrary(dir)
+	lib, err := OpenChosenLibrary(dir)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -34,10 +34,10 @@ func main() {
 	// /media/ serves the library files, everything else the page.
 	page, _ := fs.Sub(web, "web")
 	pages := mygo.FileServer(page)
-	media := http.StripPrefix("/media/", mygo.FileServer(os.DirFS(lib.mediaDir())))
 	mygo.Protocol.HandleFunc("mygo", func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/media/") {
-			media.ServeHTTP(w, r)
+			// The media directory moves when the user chooses another one.
+			http.StripPrefix("/media/", mygo.FileServer(os.DirFS(lib.mediaDir()))).ServeHTTP(w, r)
 			return
 		}
 		pages.ServeHTTP(w, r)

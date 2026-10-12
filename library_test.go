@@ -68,7 +68,7 @@ func TestNetworkAdd(t *testing.T) {
 			t.Error("added twice")
 		}
 	}
-	l2, err := OpenLibrary(l.dir)
+	l2, err := OpenLibrary(l.root())
 	if err != nil || len(l2.List().Bookmarks) != 2 || l2.List().Bookmarks[0].FolderID != f.ID {
 		t.Fatalf("reload: %+v %v", l2.List(), err)
 	}

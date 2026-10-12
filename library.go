@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/egoist/mygo"
@@ -57,32 +58,47 @@ type Snapshot struct {
 // Library stores bookmarks in library.json and media in media/.
 type Library struct {
 	mu       sync.Mutex
-	dir      string
+	dir      atomic.Pointer[string] // changes when the user moves the data
+	home     string                 // the app's data directory, which holds data.json
+	missing  string                 // the chosen directory, when it was not found at launch
 	data     Snapshot
 	inflight map[string]bool
 }
 
 // OpenLibrary loads or creates the library in dir.
 func OpenLibrary(dir string) (*Library, error) {
-	l := &Library{dir: dir, inflight: map[string]bool{}}
-	if err := os.MkdirAll(l.mediaDir(), 0o755); err != nil {
-		return nil, err
-	}
-	b, err := os.ReadFile(l.file())
-	if errors.Is(err, os.ErrNotExist) {
-		return l, nil
-	}
+	l := &Library{home: dir, inflight: map[string]bool{}}
+	data, err := loadLibrary(dir)
 	if err != nil {
 		return nil, err
 	}
-	if err := json.Unmarshal(b, &l.data); err != nil {
-		return nil, fmt.Errorf("library.json : %w", err)
-	}
+	l.data = data
+	l.dir.Store(&dir)
 	return l, nil
 }
 
-func (l *Library) file() string     { return filepath.Join(l.dir, "library.json") }
-func (l *Library) mediaDir() string { return filepath.Join(l.dir, "media") }
+// loadLibrary reads the library in dir, creating its media directory.
+func loadLibrary(dir string) (Snapshot, error) {
+	var data Snapshot
+	if err := os.MkdirAll(filepath.Join(dir, "media"), 0o755); err != nil {
+		return data, err
+	}
+	b, err := os.ReadFile(filepath.Join(dir, "library.json"))
+	if errors.Is(err, os.ErrNotExist) {
+		return data, nil
+	}
+	if err == nil {
+		err = json.Unmarshal(b, &data)
+	}
+	if err != nil {
+		return data, fmt.Errorf("library.json : %w", err)
+	}
+	return data, nil
+}
+
+func (l *Library) root() string     { return *l.dir.Load() }
+func (l *Library) file() string     { return filepath.Join(l.root(), "library.json") }
+func (l *Library) mediaDir() string { return filepath.Join(l.root(), "media") }
 
 // save writes the library; the caller holds l.mu.
 func (l *Library) save() error {

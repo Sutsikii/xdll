@@ -12,8 +12,15 @@ import (
 	"time"
 )
 
+// libraryAt is an empty library in dir, without touching the disk.
+func libraryAt(dir string) *Library {
+	l := &Library{home: dir}
+	l.dir.Store(&dir)
+	return l
+}
+
 func TestClaudeText(t *testing.T) {
-	l := &Library{dir: `C:\data`}
+	l := libraryAt(`C:\data`)
 	b := Bookmark{
 		ID: "42", URL: "https://x.com/nasa/status/42", Author: "nasa", AuthorName: "NASA",
 		Text: "Hello Mars", Note: "pour le projet", PostedAt: time.Date(2026, 10, 9, 14, 30, 0, 0, time.Local),
@@ -55,7 +62,7 @@ func TestPNGOfScalesDown(t *testing.T) {
 }
 
 func TestClipboardDataModes(t *testing.T) {
-	l := &Library{dir: t.TempDir()}
+	l := libraryAt(t.TempDir())
 	os.MkdirAll(filepath.Join(l.mediaDir(), "42"), 0o755)
 	var buf bytes.Buffer
 	png.Encode(&buf, image.NewRGBA(image.Rect(0, 0, 10, 10)))

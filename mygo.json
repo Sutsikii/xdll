@@ -1,7 +1,7 @@
 {
   "name": "xdll",
   "identifier": "dev.sutsiki.xdll",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "out": "build",
   "updates": {
     "publicKey": "R5AWg9otkmcQ38mm3vo7MJrorN+IpcuMKNqkUy0rI2s=",
