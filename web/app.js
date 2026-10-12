@@ -21,6 +21,7 @@ const icons = {
   right: svg('<path d="m9 18 6-6-6-6"/>'),
   play: svg('<path fill="currentColor" d="M7 4v16l13-8z"/>'),
   image: svg('<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/>'),
+  gear: svg('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'),
   check: svg('<path d="M20 6 9 17l-5-5"/>', 'stroke-width="3"'),
 };
 
@@ -269,10 +270,14 @@ function renderSidebar() {
   if (!state.folders.length) {
     folders.innerHTML = `<div class="hint">Aucun dossier</div>`;
   }
+  $("#stats").textContent = statsText();
+  $("#title").textContent = viewTitle();
+}
+
+function statsText() {
   const size = state.bookmarks.reduce((s, b) => s + totalSize(b), 0);
   const media = state.bookmarks.reduce((s, b) => s + b.media.length, 0);
-  $("#stats").textContent = `${state.bookmarks.length} posts · ${media} médias · ${fmtSize(size)}`;
-  $("#title").textContent = viewTitle();
+  return `${state.bookmarks.length} posts · ${media} médias · ${fmtSize(size)}`;
 }
 
 function folderMenu(f, x, y) {
@@ -628,6 +633,86 @@ $("#v-file").onclick = () => run(call("OpenMedia", current().media[state.viewer.
 $("#v-export").onclick = () => exportIds([current().id]);
 $("#v-delete").onclick = () => deleteIds([current().id]);
 
+// --- Settings -------------------------------------------------------------------
+
+async function openSettings() {
+  $("#settings").hidden = false;
+  $("#data-stats").textContent = statsText();
+  $("#settings-close").focus();
+  const info = await run(call("Settings"));
+  if (info) {
+    $("#data-dir").textContent = info.dir;
+    $("#data-version").textContent = info.version || "dev";
+  }
+}
+
+const closeSettings = () => ($("#settings").hidden = true);
+
+// busy disables the settings buttons while fn runs.
+async function busy(btn, label, fn) {
+  const buttons = [...$("#settings").querySelectorAll(".settings-row button")];
+  const text = btn.textContent;
+  buttons.forEach((b) => (b.disabled = true));
+  btn.textContent = label;
+  try {
+    await fn();
+  } finally {
+    buttons.forEach((b) => (b.disabled = false));
+    btn.textContent = text;
+  }
+}
+
+function backup() {
+  let prefs = "";
+  try {
+    prefs = localStorage.getItem("xdll.prefs") || "";
+  } catch {}
+  return busy($("#backup"), "Sauvegarde…", async () => {
+    const r = await run(call("Backup", prefs));
+    if (r?.file) toast(`Sauvegardé : ${r.posts} posts, ${r.files} fichiers`);
+  });
+}
+
+async function restore(replace) {
+  if (replace) {
+    const ok = await ask({
+      title: "Remplacer la bibliothèque ?",
+      text: `Les ${state.bookmarks.length} posts actuels et leurs fichiers seront effacés et remplacés par la sauvegarde.`,
+      ok: "Choisir la sauvegarde",
+      danger: true,
+    });
+    if (!ok) return;
+  }
+  const btn = replace ? $("#restore-replace") : $("#restore-merge");
+  return busy(btn, "Import…", async () => {
+    const r = await run(call("Restore", replace));
+    if (!r) return;
+    if (r.prefs) {
+      try {
+        localStorage.setItem("xdll.prefs", r.prefs);
+        const p = JSON.parse(r.prefs);
+        if (p.sort) $("#sort").value = state.sort = p.sort;
+        if (p.zoom) zoom(($("#zoom").value = p.zoom));
+      } catch {}
+    }
+    state.selected.clear();
+    if (replace) state.view = { type: "all" };
+    apply(r.library);
+    $("#data-stats").textContent = statsText();
+    toast(`Importé : ${r.added} post${r.added > 1 ? "s" : ""}` + (r.skipped ? `, ${r.skipped} déjà présent${r.skipped > 1 ? "s" : ""}` : ""));
+  });
+}
+
+$("#open-settings").innerHTML = icons.gear;
+$("#open-settings").onclick = openSettings;
+$("#settings-close").innerHTML = icons.close;
+$("#settings-close").onclick = closeSettings;
+$("#settings").onmousedown = (e) => e.target === e.currentTarget && closeSettings();
+$("#backup").onclick = backup;
+$("#restore-merge").onclick = () => restore(false);
+$("#restore-replace").onclick = () => restore(true);
+$("#open-data-dir").onclick = () => run(call("OpenDataDir"));
+
 // --- Toolbar and keyboard ----------------------------------------------------------
 
 $("#new-folder").innerHTML = icons.plus;
@@ -674,6 +759,10 @@ $("#selection-move").onchange = async (e) => {
 addEventListener("keydown", (e) => {
   const typing = e.target.closest("input, textarea, select");
   if (!$("#dialog").hidden) return;
+  if (!$("#settings").hidden) {
+    if (e.key === "Escape") closeSettings();
+    return;
+  }
   if (state.viewer) {
     if (e.key === "Escape") closeViewer();
     else if (typing) return;

@@ -12,6 +12,7 @@ Faite avec [MyGo](https://github.com/egoist/mygo) (Go + WebView2).
 - Recherche, filtre par type, tri
 - Sélection multiple, export, suppression
 - Copier pour Claude : texte du post (avec les chemins des fichiers), image, ou les deux
+- Paramètres (roue en bas à gauche) : sauvegarde et import de toute la bibliothèque
 
 Les médias restent sur le PC, même si le post est supprimé de X.
 
@@ -22,7 +23,11 @@ Tout est dans `%APPDATA%\xdll` :
 - `library.json` : posts, dossiers, favoris, notes
 - `media\<id du post>\` : les fichiers
 
-Sauvegarder ce dossier suffit pour garder la bibliothèque.
+## Changer de PC
+
+1. Paramètres → **Sauvegarder la bibliothèque** : un `.zip` avec les posts, dossiers, favoris, notes, médias et réglages.
+2. Copier le `.zip` sur le nouveau PC.
+3. Installer xdll, Paramètres → **Remplacer** (ou **Fusionner** pour ajouter seulement les posts absents).
 
 ## Raccourcis
 
@@ -58,6 +63,7 @@ XDLL_CLIP=1 go test -run Clipboard .   # vrai presse-papier (Windows)
 | `twitter.go` | récupère le post (API syndication, puis FxTwitter) et télécharge |
 | `library.go` | bibliothèque : posts, dossiers, export |
 | `claude.go` | copie pour Claude (texte + image) |
+| `backup.go` | sauvegarde et import (.zip) |
 | `web/` | interface (HTML, CSS, JS sans build) |
 
 ## Limites

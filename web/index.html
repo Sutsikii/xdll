@@ -17,7 +17,10 @@
       <button id="new-folder" class="icon-btn" title="Nouveau dossier" aria-label="Nouveau dossier"></button>
     </div>
     <nav id="folders" class="nav folders"></nav>
-    <div class="sidebar-foot" id="stats"></div>
+    <div class="sidebar-foot">
+      <span id="stats"></span>
+      <button id="open-settings" class="icon-btn" title="Paramètres" aria-label="Paramètres"></button>
+    </div>
   </aside>
 
   <main class="main">
@@ -104,6 +107,53 @@
         <button id="v-delete" class="danger">Supprimer</button>
       </div>
     </aside>
+  </div>
+
+  <div id="settings" class="dialog" hidden>
+    <div class="settings-card" role="dialog" aria-labelledby="settings-title">
+      <div class="settings-head">
+        <h2 id="settings-title">Paramètres</h2>
+        <button class="icon-btn" id="settings-close" aria-label="Fermer"></button>
+      </div>
+
+      <section>
+        <h3>Sauvegarde</h3>
+        <p class="muted">Un seul fichier .zip avec les posts, dossiers, favoris, notes, médias et réglages.</p>
+        <div class="settings-row">
+          <button id="backup" class="primary">Sauvegarder la bibliothèque</button>
+        </div>
+      </section>
+
+      <section>
+        <h3>Importer une sauvegarde</h3>
+        <p class="muted">Fusionner ajoute les posts absents et garde les autres. Remplacer efface la bibliothèque actuelle.</p>
+        <div class="settings-row">
+          <button id="restore-merge">Fusionner</button>
+          <button id="restore-replace" class="danger">Remplacer</button>
+        </div>
+      </section>
+
+      <section>
+        <h3>Changer de PC</h3>
+        <ol class="steps muted">
+          <li>Ici : Sauvegarder la bibliothèque.</li>
+          <li>Copier le .zip sur le nouveau PC (clé USB, cloud…).</li>
+          <li>Installer xdll, ouvrir Paramètres, Importer puis Remplacer.</li>
+        </ol>
+      </section>
+
+      <section>
+        <h3>Données</h3>
+        <dl class="meta">
+          <dt>Dossier</dt><dd><span id="data-dir" class="path"></span></dd>
+          <dt>Contenu</dt><dd id="data-stats"></dd>
+          <dt>Version</dt><dd id="data-version"></dd>
+        </dl>
+        <div class="settings-row">
+          <button id="open-data-dir">Ouvrir le dossier</button>
+        </div>
+      </section>
+    </div>
   </div>
 
   <div id="dialog" class="dialog" hidden>
