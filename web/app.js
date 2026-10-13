@@ -53,6 +53,7 @@ const state = {
   selected: new Set(),
   pending: [], // { key, url, id, error }
   viewer: null, // { ids, pos, media }
+  settings: false, // the settings page is shown instead of the library
 };
 
 function load(key, fallback) {
@@ -220,6 +221,7 @@ function viewTitle() {
 
 function render() {
   renderSidebar();
+  if (state.settings) renderStorage();
   renderGrid();
   renderSelection();
   if (state.viewer) renderViewer();
@@ -254,6 +256,7 @@ function navLink({ icon, label, count, on, onClick, folderId, onContext }) {
 }
 
 function setView(view) {
+  if (state.settings) closeSettings();
   state.view = view;
   state.selected.clear();
   render();
@@ -261,7 +264,7 @@ function setView(view) {
 }
 
 function renderSidebar() {
-  const v = state.view;
+  const v = state.settings ? {} : state.view;
   const n = (view) => state.bookmarks.filter((b) => inView(b, view)).length;
   const views = $("#views");
   views.replaceChildren(
@@ -286,7 +289,7 @@ function renderSidebar() {
   if (!state.folders.length) {
     folders.innerHTML = `<div class="hint">Aucun dossier</div>`;
   }
-  $("#stats").textContent = statsText();
+  $("#open-settings").className = state.settings ? "on" : "";
   $("#title").textContent = viewTitle();
 }
 
@@ -521,6 +524,7 @@ async function add(url) {
     return toast(`Déjà enregistré : ${dup.authorName || dup.author} sur ${sources[sourceOf(dup)].name} (${where}). Cliquer pour l'ouvrir`, true, () => openViewer([dup.id], 0));
   }
   if (id && state.pending.some((p) => p.id === id && !p.error)) return toast("Déjà en cours de téléchargement", true);
+  if (state.settings) closeSettings();
   const folderId = state.view.type === "folder" ? state.view.id : "";
   const p = { key: Math.random(), url, id, source: sourceOfID(id) };
   state.pending.unshift(p);
@@ -664,11 +668,55 @@ $("#v-delete").onclick = () => deleteIds([current().id]);
 // --- Settings -------------------------------------------------------------------
 
 async function openSettings() {
+  if (state.viewer) closeViewer();
+  state.settings = true;
+  $(".main").hidden = true;
   $("#settings").hidden = false;
-  $("#data-stats").textContent = statsText();
-  $("#settings-close").focus();
+  render();
   showSettings(await run(call("Settings")));
   showUpdates(await run(call("Updates")));
+}
+
+function closeSettings() {
+  state.settings = false;
+  $("#settings").hidden = true;
+  $(".main").hidden = false;
+  renderSidebar();
+}
+
+// renderStorage shows what the library holds, by site and by kind.
+function renderStorage() {
+  const bySource = {};
+  const byKind = {};
+  let media = 0;
+  for (const b of state.bookmarks) {
+    const src = (bySource[sourceOf(b)] ??= { posts: 0, size: 0 });
+    src.posts++;
+    media += b.media.length;
+    for (const m of b.media) {
+      const k = (byKind[m.kind] ??= { n: 0, size: 0 });
+      k.n++;
+      k.size += m.size || 0;
+      src.size += m.size || 0;
+    }
+  }
+  const size = Object.values(bySource).reduce((n, s) => n + s.size, 0);
+  const sizeText = (n) => (n ? fmtSize(n) : "0 Ko");
+  $("#st-posts").textContent = state.bookmarks.length;
+  $("#st-media").textContent = media;
+  $("#st-size").textContent = sizeText(size);
+  const present = Object.keys(sources).filter((k) => bySource[k]);
+  $("#st-bar").innerHTML = present
+    .filter((k) => bySource[k].size)
+    .map((k) => `<i class="src-${k}" style="flex: ${bySource[k].size}" title="${sources[k].name} : ${fmtSize(bySource[k].size)}"></i>`)
+    .join("");
+  $("#st-sources").innerHTML = present
+    .map((k) => `<span>${sourceIcon(k)}${sources[k].name} <small>${bySource[k].posts} post${bySource[k].posts > 1 ? "s" : ""} · ${sizeText(bySource[k].size)}</small></span>`)
+    .join("");
+  $("#st-kinds").innerHTML = [["image", "Images"], ["video", "Vidéos"], ["gif", "GIF"]]
+    .filter(([k]) => byKind[k])
+    .map(([k, label]) => `<span>${label} : ${byKind[k].n} · ${sizeText(byKind[k].size)}</span>`)
+    .join("");
 }
 
 function showSettings(info) {
@@ -694,7 +742,6 @@ async function moveData(c) {
     if (!s) return;
     showSettings(s);
     apply(await call("List"));
-    $("#data-stats").textContent = statsText();
     toast("Données dans " + s.dir);
   });
 }
@@ -709,8 +756,6 @@ function showUpdates(u) {
 }
 
 const setUpdates = () => run(call("SetUpdates", $("#auto-check").checked, $("#auto-install").checked), showUpdates);
-
-const closeSettings = () => ($("#settings").hidden = true);
 
 // busy disables the settings buttons while fn runs.
 async function busy(btn, label, fn) {
@@ -762,16 +807,12 @@ async function restore(replace) {
     state.selected.clear();
     if (replace) state.view = { type: "all" };
     apply(r.library);
-    $("#data-stats").textContent = statsText();
     toast(`Importé : ${r.added} post${r.added > 1 ? "s" : ""}` + (r.skipped ? `, ${r.skipped} déjà présent${r.skipped > 1 ? "s" : ""}` : ""));
   });
 }
 
-$("#open-settings").innerHTML = icons.gear;
+$("#open-settings").innerHTML = `${icons.gear}<span class="label">Paramètres</span>`;
 $("#open-settings").onclick = openSettings;
-$("#settings-close").innerHTML = icons.close;
-$("#settings-close").onclick = closeSettings;
-$("#settings").onmousedown = (e) => e.target === e.currentTarget && closeSettings();
 $("#backup").onclick = backup;
 $("#restore-merge").onclick = () => restore(false);
 $("#restore-replace").onclick = () => restore(true);
@@ -838,8 +879,8 @@ $("#selection-move").onchange = async (e) => {
 addEventListener("keydown", (e) => {
   const typing = e.target.closest("input, textarea, select");
   if (!$("#dialog").hidden) return;
-  if (!$("#settings").hidden) {
-    if (e.key === "Escape") closeSettings();
+  if (state.settings) {
+    if (e.key === "Escape" && !typing) closeSettings();
     return;
   }
   if (state.viewer) {

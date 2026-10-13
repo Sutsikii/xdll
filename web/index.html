@@ -17,10 +17,9 @@
       <button id="new-folder" class="icon-btn" title="Nouveau dossier" aria-label="Nouveau dossier"></button>
     </div>
     <nav id="folders" class="nav folders"></nav>
-    <div class="sidebar-foot">
-      <span id="stats"></span>
-      <button id="open-settings" class="icon-btn" title="Paramètres" aria-label="Paramètres"></button>
-    </div>
+    <nav class="nav sidebar-foot">
+      <a id="open-settings"></a>
+    </nav>
   </aside>
 
   <main class="main">
@@ -110,31 +109,48 @@
     </aside>
   </div>
 
-  <div id="settings" class="dialog" hidden>
-    <div class="settings-card" role="dialog" aria-labelledby="settings-title">
-      <div class="settings-head">
-        <h2 id="settings-title">Paramètres</h2>
-        <button class="icon-btn" id="settings-close" aria-label="Fermer"></button>
-      </div>
+  <div id="settings" class="settings-page" hidden>
+    <div class="settings-inner">
+      <h1>Paramètres</h1>
 
-      <section>
-        <h3>Sauvegarde</h3>
+      <section class="panel">
+        <h2>Stockage</h2>
+        <div class="stats">
+          <div><b id="st-posts"></b><span>posts</span></div>
+          <div><b id="st-media"></b><span>médias</span></div>
+          <div><b id="st-size"></b><span>sur le disque</span></div>
+        </div>
+        <div id="st-bar" class="usage-bar"></div>
+        <div id="st-sources" class="usage-legend"></div>
+        <div id="st-kinds" class="usage-legend muted"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Données</h2>
+        <p id="data-missing" class="warn" hidden></p>
+        <dl class="meta">
+          <dt>Dossier</dt><dd><span id="data-dir" class="path"></span></dd>
+          <dt>Version</dt><dd id="data-version"></dd>
+        </dl>
+        <div class="settings-row">
+          <button id="change-data-dir">Changer de dossier</button>
+          <button id="reset-data-dir" class="ghost">Dossier par défaut</button>
+          <button id="open-data-dir">Ouvrir le dossier</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Sauvegarde</h2>
         <p class="muted">Un seul fichier .zip avec les posts, dossiers, favoris, notes, médias et réglages.</p>
         <div class="settings-row">
           <button id="backup" class="primary">Sauvegarder la bibliothèque</button>
         </div>
-      </section>
-
-      <section>
         <h3>Importer une sauvegarde</h3>
         <p class="muted">Fusionner ajoute les posts absents et garde les autres. Remplacer efface la bibliothèque actuelle.</p>
         <div class="settings-row">
           <button id="restore-merge">Fusionner</button>
           <button id="restore-replace" class="danger">Remplacer</button>
         </div>
-      </section>
-
-      <section>
         <h3>Changer de PC</h3>
         <ol class="steps muted">
           <li>Ici : Sauvegarder la bibliothèque.</li>
@@ -143,29 +159,14 @@
         </ol>
       </section>
 
-      <section>
-        <h3>Mises à jour</h3>
+      <section class="panel">
+        <h2>Mises à jour</h2>
         <p id="update-off" class="muted" hidden>Indisponibles dans cette version de développement.</p>
         <label class="check-row"><input type="checkbox" id="auto-check" /> Vérifier automatiquement (une fois par jour)</label>
         <label class="check-row"><input type="checkbox" id="auto-install" /> Installer sans demander</label>
         <div class="settings-row">
           <button id="check-updates">Rechercher des mises à jour</button>
           <span id="last-check" class="muted small"></span>
-        </div>
-      </section>
-
-      <section>
-        <h3>Données</h3>
-        <p id="data-missing" class="warn" hidden></p>
-        <dl class="meta">
-          <dt>Dossier</dt><dd><span id="data-dir" class="path"></span></dd>
-          <dt>Contenu</dt><dd id="data-stats"></dd>
-          <dt>Version</dt><dd id="data-version"></dd>
-        </dl>
-        <div class="settings-row">
-          <button id="change-data-dir">Changer de dossier</button>
-          <button id="reset-data-dir" class="ghost">Dossier par défaut</button>
-          <button id="open-data-dir">Ouvrir le dossier</button>
         </div>
       </section>
     </div>
