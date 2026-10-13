@@ -15,7 +15,7 @@ Faite avec [MyGo](https://github.com/egoist/mygo) (Go + WebView2).
 - Recherche, filtre par type, tri
 - Sélection multiple, export, suppression
 - Copier pour Claude : texte du post (avec les chemins des fichiers), image, ou les deux
-- Paramètres (roue en bas à gauche) : sauvegarde et import de toute la bibliothèque
+- Paramètres (en bas à gauche) : place prise par site et par type, qualité des vidéos, sauvegarde et import de toute la bibliothèque
 
 Les médias restent sur le PC, même si le post est supprimé de X.
 
@@ -27,6 +27,19 @@ Par défaut tout est dans `%APPDATA%\xdll` :
 - `media\<id du post>\` : les fichiers
 
 Paramètres → Données → **Changer de dossier** déplace `library.json` et `media` ailleurs (autre disque, dossier synchronisé…). Si le dossier choisi contient déjà une bibliothèque xdll, elle est utilisée telle quelle. Le chemin choisi est retenu dans `%APPDATA%\xdll\data.json` ; s'il est introuvable au lancement (disque débranché), l'app le signale et utilise le dossier par défaut en attendant.
+
+## Qualité des vidéos
+
+Paramètres → Qualité des vidéos :
+
+- **Économie** (par défaut) : X en 720p, YouTube en AV1 jusqu'à 1080p. 2 à 4 fois moins de place, sans réencodage : ce sont des versions que les sites servent déjà. Instagram n'a qu'une version.
+- **Maximale** : la meilleure version du site, en H.264.
+
+**Alléger** re-télécharge en version économie les vidéos enregistrées en qualité maximale, et garde chaque nouveau fichier s'il est plus léger. Les posts qui ne sont plus en ligne gardent leurs fichiers.
+
+À l'export, les vidéos en version économie sont re-téléchargées en qualité maximale tant que le post est en ligne (option à décocher pour exporter les fichiers tels quels).
+
+Les vidéos YouTube en AV1 se lisent dans l'app ; pour les ouvrir dans le lecteur Windows, il faut l'extension AV1 du Microsoft Store (souvent déjà installée sur Windows 11).
 
 ## Changer de PC
 
@@ -85,6 +98,7 @@ La clé qui signe les mises à jour est dans `%APPDATA%\mygo\update-keys\mygo-up
 | `mux.go` | fusionne la vidéo et le son YouTube en un MP4, sans ffmpeg |
 | `library.go` | bibliothèque : posts, dossiers, export |
 | `claude.go` | copie pour Claude (texte + image) |
+| `optimize.go` | allège la bibliothèque (vidéos re-téléchargées en économie) |
 | `backup.go` | sauvegarde et import (.zip) |
 | `update.go` | réglages des mises à jour |
 | `datadir.go` | choix du dossier des données |
