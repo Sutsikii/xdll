@@ -30,12 +30,16 @@ func TestParseTweetID(t *testing.T) {
 
 func TestParsePostID(t *testing.T) {
 	for in, want := range map[string]string{
-		"https://x.com/a/status/123456789":                        "123456789",
-		"https://www.youtube.com/shorts/1dnMj4UqaLk":              "yt-1dnMj4UqaLk",
-		"https://youtube.com/shorts/-nt_bLCNMOc?si=abc":           "yt--nt_bLCNMOc",
-		"https://www.youtube.com/watch?v=jNQXAC9IVRw&t=10s":       "yt-jNQXAC9IVRw",
-		"https://m.youtube.com/watch?feature=share&v=jNQXAC9IVRw": "yt-jNQXAC9IVRw",
-		"https://youtu.be/jNQXAC9IVRw?si=x":                       "yt-jNQXAC9IVRw",
+		"https://x.com/a/status/123456789":                            "123456789",
+		"https://www.youtube.com/shorts/1dnMj4UqaLk":                  "yt-1dnMj4UqaLk",
+		"https://youtube.com/shorts/-nt_bLCNMOc?si=abc":               "yt--nt_bLCNMOc",
+		"https://www.youtube.com/watch?v=jNQXAC9IVRw&t=10s":           "yt-jNQXAC9IVRw",
+		"https://m.youtube.com/watch?feature=share&v=jNQXAC9IVRw":     "yt-jNQXAC9IVRw",
+		"https://youtu.be/jNQXAC9IVRw?si=x":                           "yt-jNQXAC9IVRw",
+		"https://www.instagram.com/p/BsOGulcndj-/":                    "ig-BsOGulcndj-",
+		"https://www.instagram.com/reel/DWAUs7jANkM/?igsh=abc":        "ig-DWAUs7jANkM",
+		"https://www.instagram.com/reels/DWAUs7jANkM/":                "ig-DWAUs7jANkM",
+		"https://www.instagram.com/natgeo/p/DWAUs7jANkM/?img_index=1": "ig-DWAUs7jANkM",
 	} {
 		got, err := parsePostID(in)
 		if err != nil || got != want {
@@ -79,6 +83,8 @@ func TestNetworkAdd(t *testing.T) {
 		"https://x.com/elonmusk/status/1585341984679469056", // a video
 		"https://x.com/NASAMars/status/2108374638355230914", // a photo
 		"https://www.youtube.com/shorts/1dnMj4UqaLk",        // a Short, audio apart
+		"https://www.instagram.com/reel/DWAUs7jANkM/",       // a reel
+		"https://www.instagram.com/p/BsOGulcndj-/",          // a photo
 	}
 	for _, u := range urls {
 		b, err := l.Add(context.Background(), u, f.ID)

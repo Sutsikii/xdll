@@ -31,7 +31,7 @@ type Media struct {
 // Bookmark is a saved post and its media.
 type Bookmark struct {
 	ID         string    `json:"id"`
-	Source     string    `json:"source,omitempty"` // "x" or "youtube"; X when empty (older posts)
+	Source     string    `json:"source,omitempty"` // "x", "youtube" or "instagram"; X when empty (older posts)
 	URL        string    `json:"url"`
 	Author     string    `json:"author"`
 	AuthorName string    `json:"authorName"`
@@ -196,6 +196,9 @@ func (l *Library) Add(ctx context.Context, url, folderID string) (Bookmark, erro
 			return Bookmark{}, err
 		}
 		media := Media{Kind: m.Kind, File: id + "/" + name, Width: m.Width, Height: m.Height, Size: n}
+		if media.Width == 0 {
+			media.Width, media.Height = mediaSize(filepath.Join(dir, name), m.Kind)
+		}
 		if m.Thumb != "" {
 			thumb := strconv.Itoa(i+1) + ".thumb" + extOf(m.Thumb, "image")
 			if _, err := download(ctx, m.Thumb, filepath.Join(dir, thumb)); err == nil {
