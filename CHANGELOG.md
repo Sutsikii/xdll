@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.0
+
+- Qualité Économie (par défaut) : X en 720p, YouTube en AV1 jusqu'à 1080p, 2 à 4 fois moins de place
+- Alléger la bibliothèque : les vidéos déjà enregistrées en qualité maximale passent en version économie
+- Export des vidéos en qualité maximale (re-téléchargées si le post est encore en ligne)
+- Paramètres devient une vraie page, avec le stockage de la bibliothèque (posts, médias, place par site)
+
 ## 0.4.0
 
 - Shorts et vidéos YouTube : meilleure qualité avec le son d'origine (pas le doublage automatique)
