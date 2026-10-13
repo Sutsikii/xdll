@@ -47,7 +47,7 @@ func TestClipboardForClaude(t *testing.T) {
 		"https://x.com/NASAMars/status/2108374638355230914",
 		"https://x.com/elonmusk/status/1585341984679469056",
 	} {
-		b, err := l.Add(context.Background(), u, "")
+		b, err := l.Add(context.Background(), u, "", QualityMax)
 		if err != nil {
 			t.Fatal(err)
 		}

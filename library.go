@@ -26,6 +26,7 @@ type Media struct {
 	Width  int    `json:"width,omitempty"`
 	Height int    `json:"height,omitempty"`
 	Size   int64  `json:"size"`
+	Light  bool   `json:"light,omitempty"` // a video downloaded in economy quality
 }
 
 // Bookmark is a saved post and its media.
@@ -150,8 +151,14 @@ func (l *Library) List() Snapshot {
 	return l.snapshot()
 }
 
-// Add downloads the media of the post at url into folderID.
-func (l *Library) Add(ctx context.Context, url, folderID string) (Bookmark, error) {
+// Video qualities: the best the site has, or lighter videos.
+const (
+	QualityMax     = "max"
+	QualityEconomy = "economy"
+)
+
+// Add downloads the media of the post at url into folderID, in quality.
+func (l *Library) Add(ctx context.Context, url, folderID, quality string) (Bookmark, error) {
 	id, err := parsePostID(url)
 	if err != nil {
 		return Bookmark{}, err
@@ -173,7 +180,7 @@ func (l *Library) Add(ctx context.Context, url, folderID string) (Bookmark, erro
 		l.mu.Unlock()
 	}()
 
-	t, err := fetchPost(ctx, id)
+	t, err := fetchPost(ctx, id, quality == QualityEconomy)
 	if err != nil {
 		return Bookmark{}, err
 	}
@@ -195,7 +202,7 @@ func (l *Library) Add(ctx context.Context, url, folderID string) (Bookmark, erro
 			os.RemoveAll(dir)
 			return Bookmark{}, err
 		}
-		media := Media{Kind: m.Kind, File: id + "/" + name, Width: m.Width, Height: m.Height, Size: n}
+		media := Media{Kind: m.Kind, File: id + "/" + name, Width: m.Width, Height: m.Height, Size: n, Light: m.Light}
 		if media.Width == 0 {
 			media.Width, media.Height = mediaSize(filepath.Join(dir, name), m.Kind)
 		}

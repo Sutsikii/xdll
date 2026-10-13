@@ -241,6 +241,11 @@ input { user-select: text; }
 .usage-legend .muted, .usage-legend small { color: var(--muted); font-size: 12px; }
 .settings-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .settings-row .small { align-self: center; font-size: 12px; }
+.choice { display: flex; gap: 10px; align-items: start; padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px; cursor: pointer; }
+.choice:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.choice input { accent-color: var(--accent); margin: 2px 0 0; width: 15px; height: 15px; flex: none; }
+.choice span { display: flex; flex-direction: column; gap: 2px; }
+.choice small { color: var(--muted); font-size: 12.5px; line-height: 1.4; }
 .check-row { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 .check-row input { accent-color: var(--accent); width: 15px; height: 15px; margin: 0; }
 .warn { color: var(--danger); }

@@ -41,7 +41,7 @@ const handle = (b) => (/^UC[\w-]{22}$/.test(b.author) ? "" : "@" + b.author);
 
 // --- State ------------------------------------------------------------------
 
-const prefs = load("xdll.prefs", { sort: "added-desc", zoom: 220 });
+const prefs = load("xdll.prefs", { sort: "added-desc", zoom: 220, quality: "economy" });
 const state = {
   folders: [],
   bookmarks: [],
@@ -50,6 +50,7 @@ const state = {
   kind: "",
   source: "",
   sort: prefs.sort,
+  quality: prefs.quality, // of downloaded videos: "economy" or "max"
   selected: new Set(),
   pending: [], // { key, url, id, error }
   viewer: null, // { ids, pos, media }
@@ -65,7 +66,7 @@ function load(key, fallback) {
 }
 function savePrefs() {
   try {
-    localStorage.setItem("xdll.prefs", JSON.stringify({ sort: state.sort, zoom: +$("#zoom").value }));
+    localStorage.setItem("xdll.prefs", JSON.stringify({ sort: state.sort, zoom: +$("#zoom").value, quality: state.quality }));
   } catch {}
 }
 
@@ -530,7 +531,7 @@ async function add(url) {
   state.pending.unshift(p);
   renderGrid();
   try {
-    const b = await call("Add", url, folderId);
+    const b = await call("Add", url, folderId, state.quality);
     state.pending = state.pending.filter((x) => x !== p);
     if (state.view.type === "fav") await call("SetFavorite", b.id, true);
     apply(await call("List"));
@@ -677,6 +678,17 @@ async function openSettings() {
   showUpdates(await run(call("Updates")));
 }
 
+function showQuality() {
+  for (const r of document.querySelectorAll('input[name="quality"]')) r.checked = r.value === state.quality;
+}
+for (const r of document.querySelectorAll('input[name="quality"]')) {
+  r.onchange = () => {
+    state.quality = r.value;
+    savePrefs();
+  };
+}
+showQuality();
+
 function closeSettings() {
   state.settings = false;
   $("#settings").hidden = true;
@@ -802,6 +814,8 @@ async function restore(replace) {
         const p = JSON.parse(r.prefs);
         if (p.sort) $("#sort").value = state.sort = p.sort;
         if (p.zoom) zoom(($("#zoom").value = p.zoom));
+        if (p.quality) state.quality = p.quality;
+        showQuality();
       } catch {}
     }
     state.selected.clear();

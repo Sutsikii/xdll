@@ -48,7 +48,7 @@ func mergeFragmented(video, audio, dst string) error {
 
 	mvex := box("mvex", v.mehd, v.trex, a.trex)
 	moov := box("moov", mvhd, v.trak, a.trak, mvex)
-	ftyp := box("ftyp", []byte("isom"), u32(512), []byte("isomiso6avc1mp41"))
+	ftyp := box("ftyp", []byte("isom"), u32(512), []byte("isomiso6avc1av01mp41"))
 
 	out, err := os.Create(dst)
 	if err != nil {

@@ -22,15 +22,16 @@ func parsePostID(s string) (string, error) {
 	return parseTweetID(s)
 }
 
-// fetchPost describes the post of a bookmark ID.
-func fetchPost(ctx context.Context, id string) (*post, error) {
+// fetchPost describes the post of a bookmark ID. With economy, videos are
+// lighter, when the site has several versions.
+func fetchPost(ctx context.Context, id string, economy bool) (*post, error) {
 	if v, ok := strings.CutPrefix(id, "yt-"); ok {
-		return fetchYouTube(ctx, v)
+		return fetchYouTube(ctx, v, economy)
 	}
 	if code, ok := strings.CutPrefix(id, "ig-"); ok {
 		return fetchInstagram(ctx, code)
 	}
-	return fetchTweet(ctx, id)
+	return fetchTweet(ctx, id, economy)
 }
 
 var bookmarkID = regexp.MustCompile(`^(?:[0-9]+|yt-[A-Za-z0-9_-]{11}|ig-[A-Za-z0-9_-]+)$`)

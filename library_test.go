@@ -87,7 +87,7 @@ func TestNetworkAdd(t *testing.T) {
 		"https://www.instagram.com/p/BsOGulcndj-/",          // a photo
 	}
 	for _, u := range urls {
-		b, err := l.Add(context.Background(), u, f.ID)
+		b, err := l.Add(context.Background(), u, f.ID, QualityMax)
 		if err != nil {
 			t.Fatalf("%s: %v", u, err)
 		}
@@ -99,7 +99,7 @@ func TestNetworkAdd(t *testing.T) {
 			}
 			t.Logf("  %s %s %dx%d %d bytes thumb=%s", m.Kind, m.File, m.Width, m.Height, m.Size, m.Thumb)
 		}
-		if _, err := l.Add(context.Background(), u, ""); err == nil {
+		if _, err := l.Add(context.Background(), u, "", QualityMax); err == nil {
 			t.Error("added twice")
 		}
 	}
@@ -110,5 +110,38 @@ func TestNetworkAdd(t *testing.T) {
 	s, _ := l2.DeleteFolder(f.ID)
 	if s.Bookmarks[0].FolderID != "" {
 		t.Error("bookmark kept a deleted folder")
+	}
+}
+
+// XDLL_NET=1 go test -run Network: economy videos are lighter.
+func TestNetworkEconomy(t *testing.T) {
+	if os.Getenv("XDLL_NET") == "" {
+		t.Skip("set XDLL_NET=1")
+	}
+	max, err := OpenLibrary(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	eco, err := OpenLibrary(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, u := range []string{
+		"https://x.com/i/status/2108580996761493865", // 1080p
+		"https://www.youtube.com/shorts/1dnMj4UqaLk",
+	} {
+		a, err := max.Add(context.Background(), u, "", QualityMax)
+		if err != nil {
+			t.Fatalf("%s: %v", u, err)
+		}
+		b, err := eco.Add(context.Background(), u, "", QualityEconomy)
+		if err != nil {
+			t.Fatalf("%s: %v", u, err)
+		}
+		ma, mb := a.Media[0], b.Media[0]
+		t.Logf("%s: max %dx%d %d bytes, economy %dx%d %d bytes", u, ma.Width, ma.Height, ma.Size, mb.Width, mb.Height, mb.Size)
+		if ma.Light || !mb.Light || mb.Size >= ma.Size {
+			t.Errorf("%s: economy not lighter", u)
+		}
 	}
 }

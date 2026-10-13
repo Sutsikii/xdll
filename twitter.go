@@ -39,6 +39,7 @@ type remoteMedia struct {
 	Thumb    string // a poster image, for videos and GIFs
 	Width    int
 	Height   int
+	Light    bool // in economy quality
 }
 
 var statusID = regexp.MustCompile(`(?i)/status(?:es)?/(\d+)`)
@@ -79,13 +80,14 @@ func getJSON(ctx context.Context, u string, v any) error {
 	return json.NewDecoder(res.Body).Decode(v)
 }
 
-// fetchTweet tries the syndication API, then FxTwitter.
-func fetchTweet(ctx context.Context, id string) (*post, error) {
-	t, err := fetchSyndication(ctx, id)
+// fetchTweet tries the syndication API, then FxTwitter. With economy,
+// videos are at most 720p.
+func fetchTweet(ctx context.Context, id string, economy bool) (*post, error) {
+	t, err := fetchSyndication(ctx, id, economy)
 	if err == nil && len(t.Media) > 0 {
 		return t, nil
 	}
-	t2, err2 := fetchFx(ctx, id)
+	t2, err2 := fetchFx(ctx, id, economy)
 	if err2 == nil {
 		return t2, nil
 	}
@@ -114,7 +116,7 @@ func syndicationToken(id string) string {
 	return s
 }
 
-func fetchSyndication(ctx context.Context, id string) (*post, error) {
+func fetchSyndication(ctx context.Context, id string, economy bool) (*post, error) {
 	var r struct {
 		Typename  string `json:"__typename"`
 		IDStr     string `json:"id_str"`
@@ -170,12 +172,13 @@ func fetchSyndication(ctx context.Context, id string) (*post, error) {
 				rm.Kind = "gif"
 			}
 			rm.Thumb = m.MediaURLHTTPS
-			best := -1
+			var vs []xVariant
 			for _, v := range m.VideoInfo.Variants {
-				if v.ContentType == "video/mp4" && v.Bitrate >= best {
-					best, rm.URL = v.Bitrate, v.URL
+				if v.ContentType == "video/mp4" {
+					vs = append(vs, xVariant{v.URL, v.Bitrate})
 				}
 			}
+			rm.pickVariant(vs, economy)
 		}
 		if rm.URL != "" {
 			t.Media = append(t.Media, rm)
@@ -186,7 +189,7 @@ func fetchSyndication(ctx context.Context, id string) (*post, error) {
 	return t, nil
 }
 
-func fetchFx(ctx context.Context, id string) (*post, error) {
+func fetchFx(ctx context.Context, id string, economy bool) (*post, error) {
 	var r struct {
 		Code    int    `json:"code"`
 		Message string `json:"message"`
@@ -206,6 +209,11 @@ func fetchFx(ctx context.Context, id string) (*post, error) {
 					ThumbnailURL string `json:"thumbnail_url"`
 					Width        int    `json:"width"`
 					Height       int    `json:"height"`
+					Formats      []struct {
+						Container string `json:"container"`
+						Bitrate   int    `json:"bitrate"`
+						URL       string `json:"url"`
+					} `json:"formats"`
 				} `json:"all"`
 			} `json:"media"`
 		} `json:"tweet"`
@@ -236,6 +244,15 @@ func fetchFx(ctx context.Context, id string) (*post, error) {
 			rm.Kind = "gif"
 		default:
 			rm.Kind = "video"
+			var vs []xVariant
+			for _, f := range m.Formats {
+				if f.Container == "mp4" {
+					vs = append(vs, xVariant{f.URL, f.Bitrate})
+				}
+			}
+			if len(vs) > 0 {
+				rm.pickVariant(vs, economy)
+			}
 		}
 		t.Media = append(t.Media, rm)
 	}
@@ -243,6 +260,48 @@ func fetchFx(ctx context.Context, id string) (*post, error) {
 		t.URL = postURL(t)
 	}
 	return t, nil
+}
+
+// xVariant is one of the sizes of a video, as an MP4.
+type xVariant struct {
+	URL     string
+	Bitrate int
+}
+
+// economyX bounds the short side of X videos in economy: X serves 720p
+// at a quarter to a third of the size of 1080p.
+const economyX = 720
+
+var variantSize = regexp.MustCompile(`/(\d+)x(\d+)/`)
+
+// pickVariant sets m to the best variant, or with economy the best one at
+// most economyX, and its size when the URL tells it.
+func (m *remoteMedia) pickVariant(vs []xVariant, economy bool) {
+	best, bestLight := -1, -1
+	for i, v := range vs {
+		if best < 0 || v.Bitrate >= vs[best].Bitrate {
+			best = i
+		}
+		if s := variantSize.FindStringSubmatch(v.URL); s != nil {
+			w, _ := strconv.Atoi(s[1])
+			h, _ := strconv.Atoi(s[2])
+			if min(w, h) <= economyX && (bestLight < 0 || v.Bitrate >= vs[bestLight].Bitrate) {
+				bestLight = i
+			}
+		}
+	}
+	if best < 0 {
+		return
+	}
+	pick := best
+	if economy && bestLight >= 0 {
+		pick = bestLight
+	}
+	m.URL, m.Light = vs[pick].URL, economy
+	if s := variantSize.FindStringSubmatch(m.URL); s != nil {
+		m.Width, _ = strconv.Atoi(s[1])
+		m.Height, _ = strconv.Atoi(s[2])
+	}
 }
 
 // originalPhoto returns the original size URL of a photo.

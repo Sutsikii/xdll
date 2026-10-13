@@ -105,7 +105,8 @@ func ytPlayerRequest(ctx context.Context, c ytClient, id string) (*ytPlayer, err
 
 // fetchYouTube describes a video or Short: the best H.264 video stream with
 // the original audio track, to merge, or the stream with both as a fallback.
-func fetchYouTube(ctx context.Context, id string) (*post, error) {
+// With economy, the video stream is AV1 and at most 1080p.
+func fetchYouTube(ctx context.Context, id string, economy bool) (*post, error) {
 	var p *ytPlayer
 	var errs []string
 	for _, c := range []ytClient{ytAndroid, ytIOS} {
@@ -145,7 +146,7 @@ func fetchYouTube(ctx context.Context, id string) (*post, error) {
 		}
 	}
 
-	video, audio, both := pickYouTubeFormats(p.StreamingData.Formats, p.StreamingData.AdaptiveFormats)
+	video, audio, both := pickYouTubeFormats(p.StreamingData.Formats, p.StreamingData.AdaptiveFormats, economy)
 	var rm remoteMedia
 	switch {
 	case video != nil && audio != nil:
@@ -158,14 +159,20 @@ func fetchYouTube(ctx context.Context, id string) (*post, error) {
 	default:
 		return nil, errors.New("youtube : aucun flux MP4")
 	}
+	rm.Light = economy
 	rm.Thumb = youTubeThumb(ctx, id, rm.Height > rm.Width, d.Thumbnail.Thumbnails)
 	t.Media = []remoteMedia{rm}
 	return t, nil
 }
 
-// pickYouTubeFormats returns the best H.264 video stream, the best AAC
-// stream of the original audio track, and the best stream with both.
-func pickYouTubeFormats(formats, adaptive []ytFormat) (video, audio, both *ytFormat) {
+// economyYouTube bounds the short side of YouTube videos in economy.
+const economyYouTube = 1080
+
+// pickYouTubeFormats returns the best H.264 video stream, or with economy
+// the best AV1 one at most economyYouTube, the best AAC stream of the
+// original audio track, and the best stream with both. AV1 takes about half
+// the space of H.264 for the same picture.
+func pickYouTubeFormats(formats, adaptive []ytFormat, economy bool) (video, audio, both *ytFormat) {
 	for i := range formats {
 		f := &formats[i]
 		if f.URL != "" && strings.HasPrefix(f.MimeType, "video/mp4") && (both == nil || f.Height > both.Height) {
@@ -182,14 +189,26 @@ func pickYouTubeFormats(formats, adaptive []ytFormat) (video, audio, both *ytFor
 		}
 		return r
 	}
+	better := func(f, than *ytFormat) bool {
+		return than == nil || f.Height*f.Width > than.Height*than.Width ||
+			(f.Height*f.Width == than.Height*than.Width && f.Bitrate > than.Bitrate)
+	}
+	var avc, av1 *ytFormat
 	for i := range adaptive {
 		f := &adaptive[i]
+		small := min(f.Width, f.Height) <= economyYouTube
 		switch {
 		case f.URL == "":
 		case strings.HasPrefix(f.MimeType, `video/mp4; codecs="avc1`):
-			if video == nil || f.Height*f.Width > video.Height*video.Width ||
-				(f.Height*f.Width == video.Height*video.Width && f.Bitrate > video.Bitrate) {
+			if better(f, video) {
 				video = f
+			}
+			if small && better(f, avc) {
+				avc = f
+			}
+		case strings.HasPrefix(f.MimeType, `video/mp4; codecs="av01`):
+			if small && better(f, av1) {
+				av1 = f
 			}
 		case strings.HasPrefix(f.MimeType, `audio/mp4; codecs="mp4a`):
 			if f.AudioTrack != nil && f.AudioTrack.IsAutoDubbed {
@@ -198,6 +217,14 @@ func pickYouTubeFormats(formats, adaptive []ytFormat) (video, audio, both *ytFor
 			if audio == nil || audioRank(f) > audioRank(audio) {
 				audio = f
 			}
+		}
+	}
+	if economy {
+		switch {
+		case av1 != nil:
+			video = av1
+		case avc != nil:
+			video = avc
 		}
 	}
 	return video, audio, both
