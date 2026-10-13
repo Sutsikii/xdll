@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0
+
+- Shorts et vidéos YouTube : meilleure qualité avec le son d'origine (pas le doublage automatique)
+- Posts, reels et carrousels Instagram
+- Le site d'origine (X, YouTube, Instagram) est indiqué sur chaque post, et filtrable dans la barre d'outils
+
 ## 0.3.0
 
 - Choisir où enregistrer les données (Paramètres → Données → Changer de dossier) : les posts et médias sont déplacés vers ce dossier, ou la bibliothèque qui s'y trouve déjà est utilisée
