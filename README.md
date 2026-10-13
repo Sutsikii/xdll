@@ -1,13 +1,16 @@
 # xdll
 
-Petite app Windows pour télécharger les images et vidéos d'un post X/Twitter et les garder dans une bibliothèque locale.
+Petite app Windows pour télécharger les images et vidéos d'un post X/Twitter, d'un Short (ou d'une vidéo) YouTube ou d'un post/reel Instagram, et les garder dans une bibliothèque locale.
 
 Faite avec [MyGo](https://github.com/egoist/mygo) (Go + WebView2).
 
 ## Fonctions
 
 - Coller l'URL d'un post (champ du haut, Ctrl+V dans la fenêtre ou glisser un lien)
-- Images en taille originale, vidéos et GIF en MP4 meilleure qualité
+- X : images en taille originale, vidéos et GIF en MP4 meilleure qualité
+- YouTube : meilleure qualité H.264 avec la piste audio d'origine (pas le doublage auto)
+- Instagram : photos, vidéos, carrousels
+- Le site d'origine est affiché sur chaque post (icône), filtrable dans la barre d'outils
 - Dossiers, favoris, notes
 - Recherche, filtre par type, tri
 - Sélection multiple, export, suppression
@@ -75,7 +78,11 @@ La clé qui signe les mises à jour est dans `%APPDATA%\mygo\update-keys\mygo-up
 | Fichier | Rôle |
 |---|---|
 | `main.go` | fenêtre, sert la page et les médias |
-| `twitter.go` | récupère le post (API syndication, puis FxTwitter) et télécharge |
+| `sources.go` | reconnaît l'URL (X, YouTube, Instagram) et télécharge les médias |
+| `twitter.go` | récupère le post X (API syndication, puis FxTwitter) et télécharge |
+| `youtube.go` | récupère la vidéo YouTube (API du lecteur, client Android) |
+| `instagram.go` | récupère le post Instagram (via des serveurs InstaFix) |
+| `mux.go` | fusionne la vidéo et le son YouTube en un MP4, sans ffmpeg |
 | `library.go` | bibliothèque : posts, dossiers, export |
 | `claude.go` | copie pour Claude (texte + image) |
 | `backup.go` | sauvegarde et import (.zip) |
@@ -86,3 +93,5 @@ La clé qui signe les mises à jour est dans `%APPDATA%\mygo\update-keys\mygo-up
 ## Limites
 
 Les posts protégés, supprimés ou marqués sensibles ne sont pas accessibles sans compte.
+
+YouTube et Instagram ne sont pas prévus pour ça et changent souvent : un site peut cesser de marcher sans prévenir. Instagram passe par des serveurs tiers (InstaFix) : pas de date de publication, légende parfois coupée, photos en taille réduite.
