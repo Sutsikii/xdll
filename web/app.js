@@ -41,7 +41,7 @@ const handle = (b) => (/^UC[\w-]{22}$/.test(b.author) ? "" : "@" + b.author);
 
 // --- State ------------------------------------------------------------------
 
-const prefs = load("xdll.prefs", { sort: "added-desc", zoom: 220, quality: "economy" });
+const prefs = load("xdll.prefs", { sort: "added-desc", zoom: 220, quality: "economy", exportOriginal: true });
 const state = {
   folders: [],
   bookmarks: [],
@@ -51,6 +51,7 @@ const state = {
   source: "",
   sort: prefs.sort,
   quality: prefs.quality, // of downloaded videos: "economy" or "max"
+  exportOriginal: prefs.exportOriginal, // export economy videos in maximum quality
   selected: new Set(),
   pending: [], // { key, url, id, error }
   viewer: null, // { ids, pos, media }
@@ -66,7 +67,7 @@ function load(key, fallback) {
 }
 function savePrefs() {
   try {
-    localStorage.setItem("xdll.prefs", JSON.stringify({ sort: state.sort, zoom: +$("#zoom").value, quality: state.quality }));
+    localStorage.setItem("xdll.prefs", JSON.stringify({ sort: state.sort, zoom: +$("#zoom").value, quality: state.quality, exportOriginal: state.exportOriginal }));
   } catch {}
 }
 
@@ -483,8 +484,14 @@ async function copyForClaude(id, index, what) {
 
 async function exportIds(ids) {
   if (!ids.length) return toast("Rien à exporter");
-  const n = await run(call("Export", ids));
-  if (n) toast(`${n} fichier${n > 1 ? "s" : ""} exporté${n > 1 ? "s" : ""}`);
+  const light = ids.some((id) => state.bookmarks.find((b) => b.id === id)?.media.some((m) => m.light));
+  const r = await run(call("Export", ids, state.exportOriginal && light));
+  if (!r?.files) return;
+  const s = (n) => (n > 1 ? "s" : "");
+  let text = `${r.files} fichier${s(r.files)} exporté${s(r.files)}`;
+  if (r.downloaded) text += `, dont ${r.downloaded} vidéo${s(r.downloaded)} en qualité maximale`;
+  if (r.light) text += ` (${r.light} plus en ligne, en version économie)`;
+  toast(text);
 }
 
 async function deleteIds(ids) {
@@ -681,7 +688,12 @@ async function openSettings() {
 
 function showQuality() {
   for (const r of document.querySelectorAll('input[name="quality"]')) r.checked = r.value === state.quality;
+  $("#export-original").checked = state.exportOriginal;
 }
+$("#export-original").onchange = (e) => {
+  state.exportOriginal = e.target.checked;
+  savePrefs();
+};
 for (const r of document.querySelectorAll('input[name="quality"]')) {
   r.onchange = () => {
     state.quality = r.value;
@@ -713,7 +725,7 @@ async function optimize() {
   const n = heavyVideos().length;
   const ok = await ask({
     title: "Alléger la bibliothèque ?",
-    text: `${n} vidéo${n > 1 ? "s" : ""} en qualité maximale ser${n > 1 ? "ont remplacées" : "a remplacée"} par la version économie.`,
+    text: `${n} vidéo${n > 1 ? "s" : ""} en qualité maximale ser${n > 1 ? "ont remplacées" : "a remplacée"} par la version économie.` + (state.exportOriginal ? " À l'export, l'original est re-téléchargé tant qu'il est en ligne." : ""),
     ok: "Alléger",
   });
   if (!ok) return;
@@ -877,6 +889,7 @@ async function restore(replace) {
         if (p.sort) $("#sort").value = state.sort = p.sort;
         if (p.zoom) zoom(($("#zoom").value = p.zoom));
         if (p.quality) state.quality = p.quality;
+        if (p.exportOriginal !== undefined) state.exportOriginal = p.exportOriginal;
         showQuality();
       } catch {}
     }

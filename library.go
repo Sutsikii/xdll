@@ -303,8 +303,16 @@ func (l *Library) DeleteFolder(id string) (Snapshot, error) {
 	return l.snapshot(), l.save()
 }
 
-// Export copies media to a chosen directory and returns the file count.
-func (l *Library) Export(ctx context.Context, ids []string) (int, error) {
+// ExportResult describes an export.
+type ExportResult struct {
+	Files      int `json:"files"`
+	Downloaded int `json:"downloaded"` // videos downloaded again in maximum quality
+	Light      int `json:"light"`      // economy videos exported as they are: gone from their site
+}
+
+// Export copies media to a chosen directory. With original, economy videos
+// are downloaded again in maximum quality instead, when still online.
+func (l *Library) Export(ctx context.Context, ids []string, original bool) (ExportResult, error) {
 	paths, err := mygo.Dialog.Open(mygo.OpenDialogOptions{
 		Parent:            mygo.CallerWindow(ctx),
 		Title:             "Exporter",
@@ -313,28 +321,52 @@ func (l *Library) Export(ctx context.Context, ids []string) (int, error) {
 		CreateDirectories: true,
 	})
 	if err != nil || len(paths) == 0 {
-		return 0, err
+		return ExportResult{}, err
 	}
+	r, err := l.exportTo(ctx, ids, paths[0], original)
+	if r.Files > 0 {
+		mygo.Shell.OpenPath(paths[0])
+	}
+	return r, err
+}
+
+func (l *Library) exportTo(ctx context.Context, ids []string, dir string, original bool) (ExportResult, error) {
 	l.mu.Lock()
-	var files []string
-	names := map[string]string{}
+	var bookmarks []Bookmark
 	for _, b := range l.data.Bookmarks {
-		if !slices.Contains(ids, b.ID) {
-			continue
-		}
-		for i, m := range b.Media {
-			files = append(files, m.File)
-			names[m.File] = fmt.Sprintf("%s_%s_%d%s", cmpOr(b.Author, "x"), b.ID, i+1, filepath.Ext(m.File))
+		if slices.Contains(ids, b.ID) {
+			bookmarks = append(bookmarks, b)
 		}
 	}
 	l.mu.Unlock()
-	for _, f := range files {
-		if err := copyFile(filepath.Join(l.mediaDir(), filepath.FromSlash(f)), filepath.Join(paths[0], names[f])); err != nil {
-			return 0, err
+	var r ExportResult
+	for _, b := range bookmarks {
+		var p *post // the post in maximum quality, when needed
+		if original && slices.ContainsFunc(b.Media, func(m Media) bool { return m.Light }) {
+			p, _ = fetchPost(ctx, b.ID, false)
+		}
+		for i, m := range b.Media {
+			dst := filepath.Join(dir, fmt.Sprintf("%s_%s_%d%s", cmpOr(b.Author, "x"), b.ID, i+1, filepath.Ext(m.File)))
+			if m.Light && original {
+				if p != nil && len(p.Media) == len(b.Media) && p.Media[i].Kind == m.Kind {
+					if _, err := downloadMedia(ctx, p.Media[i], dst); err == nil {
+						r.Files++
+						r.Downloaded++
+						continue
+					}
+				}
+				if ctx.Err() != nil {
+					return r, ctx.Err()
+				}
+				r.Light++
+			}
+			if err := copyFile(filepath.Join(l.mediaDir(), filepath.FromSlash(m.File)), dst); err != nil {
+				return r, err
+			}
+			r.Files++
 		}
 	}
-	mygo.Shell.OpenPath(paths[0])
-	return len(files), nil
+	return r, nil
 }
 
 // Reveal shows a bookmark's files in the explorer.

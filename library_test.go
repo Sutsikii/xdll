@@ -191,3 +191,33 @@ func TestNetworkOptimize(t *testing.T) {
 		t.Errorf("still heavy: %v", ids)
 	}
 }
+
+// XDLL_NET=1 go test -run Network: exports economy videos in maximum quality.
+func TestNetworkExportOriginal(t *testing.T) {
+	if os.Getenv("XDLL_NET") == "" {
+		t.Skip("set XDLL_NET=1")
+	}
+	l, err := OpenLibrary(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := l.Add(context.Background(), "https://x.com/i/status/2108580996761493865", "", QualityEconomy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, original := range []bool{false, true} {
+		dir := t.TempDir()
+		r, err := l.exportTo(context.Background(), []string{b.ID}, dir, original)
+		if err != nil || r.Files != 1 || r.Light != 0 {
+			t.Fatalf("exportTo(%v) = %+v, %v", original, r, err)
+		}
+		st, err := os.Stat(filepath.Join(dir, b.Author+"_"+b.ID+"_1.mp4"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Logf("original=%v: %d bytes, stored %d", original, st.Size(), b.Media[0].Size)
+		if (st.Size() > b.Media[0].Size) != original || (r.Downloaded == 1) != original {
+			t.Errorf("original=%v: %+v, %d bytes", original, r, st.Size())
+		}
+	}
+}
