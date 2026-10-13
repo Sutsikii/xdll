@@ -26,7 +26,7 @@
   <main class="main">
     <form id="add-form" class="add-bar">
       <input id="add-url" type="text" autocomplete="off" spellcheck="false"
-             placeholder="URL du post" />
+             placeholder="URL d'un post X, Instagram ou d'une vidéo YouTube" />
       <button type="submit" class="primary" id="add-btn">Télécharger</button>
     </form>
 
@@ -36,6 +36,7 @@
       <div class="search">
         <input id="search" type="search" placeholder="Rechercher" />
       </div>
+      <div class="segmented" id="source-filter" role="radiogroup" aria-label="Source"></div>
       <div class="segmented" id="kind-filter" role="radiogroup" aria-label="Type">
         <button data-kind="" class="on">Tout</button>
         <button data-kind="image">Images</button>
@@ -77,7 +78,7 @@
       <div class="viewer-head">
         <div>
           <div id="v-name" class="v-name"></div>
-          <div id="v-handle" class="muted"></div>
+          <div id="v-handle" class="v-handle muted"></div>
         </div>
         <button class="icon-btn" id="v-close" aria-label="Fermer"></button>
       </div>

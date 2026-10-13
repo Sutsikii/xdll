@@ -23,7 +23,21 @@ const icons = {
   image: svg('<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/>'),
   gear: svg('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'),
   check: svg('<path d="M20 6 9 17l-5-5"/>', 'stroke-width="3"'),
+  x: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.24 2.25h3.31l-7.23 8.26 8.5 11.24h-6.65l-5.21-6.82-5.97 6.82H1.68l7.73-8.84L1.25 2.25h6.83l4.71 6.23zm-1.16 17.52h1.83L7.08 4.13H5.12z"/></svg>',
+  youtube: '<svg viewBox="0 0 24 24"><rect x="1.5" y="4.5" width="21" height="15" rx="4.5" fill="currentColor"/><path d="M10 8.8v6.4l5.5-3.2z" fill="#fff"/></svg>',
+  instagram: svg('<rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r=".6" fill="currentColor"/>', 'stroke-width="2.2"'),
 };
+
+// Sites posts come from. Older bookmarks have no source: they are from X.
+const sources = {
+  x: { name: "X", icon: icons.x },
+  youtube: { name: "YouTube", icon: icons.youtube },
+  instagram: { name: "Instagram", icon: icons.instagram },
+};
+const sourceOf = (b) => (sources[b.source] ? b.source : "x");
+const sourceIcon = (src) => `<i class="src src-${src}" title="${sources[src].name}">${sources[src].icon}</i>`;
+// A YouTube channel without a handle keeps its ID, not worth showing.
+const handle = (b) => (/^UC[\w-]{22}$/.test(b.author) ? "" : "@" + b.author);
 
 // --- State ------------------------------------------------------------------
 
@@ -34,6 +48,7 @@ const state = {
   view: { type: "all" }, // all | fav | unfiled | folder (with id)
   search: "",
   kind: "",
+  source: "",
   sort: prefs.sort,
   selected: new Set(),
   pending: [], // { key, url, id, error }
@@ -181,8 +196,9 @@ function visible() {
   const list = state.bookmarks.filter((b) => {
     if (!inView(b)) return false;
     if (state.kind && !b.media.some((m) => m.kind === state.kind)) return false;
+    if (state.source && sourceOf(b) !== state.source) return false;
     if (!terms.length) return true;
-    const hay = `${b.text} @${b.author} ${b.authorName} ${b.note} ${folderName(b.folderId) ?? ""}`.toLowerCase();
+    const hay = `${b.text} @${b.author} ${b.authorName} ${b.note} ${folderName(b.folderId) ?? ""} ${sources[sourceOf(b)].name}`.toLowerCase();
     return terms.every((t) => hay.includes(t));
   });
   const by = {
@@ -343,7 +359,7 @@ function renderGrid() {
     const el = document.createElement("div");
     el.className = "card pending" + (p.error ? " failed" : "");
     el.innerHTML = `<div class="thumb">${p.error ? esc(p.error) : ""}</div>
-      <div class="info"><div class="author"><b>${p.error ? "Échec" : "Téléchargement"}</b></div><div class="snippet">${esc(p.url)}</div></div>`;
+      <div class="info"><div class="author">${p.source ? sourceIcon(p.source) : ""}<b>${p.error ? "Échec" : "Téléchargement"}</b></div><div class="snippet">${esc(p.url)}</div></div>`;
     if (p.error) {
       el.style.cursor = "pointer";
       el.onclick = () => {
@@ -362,7 +378,7 @@ function renderGrid() {
         <span class="check">${icons.check}</span>
         <button class="star${b.favorite ? " on" : ""}" title="Favori">${b.favorite ? icons.starOn : icons.star}</button></div>
       <div class="info">
-        <div class="author"><b>${esc(b.authorName || b.author)}</b><span>@${esc(b.author)}</span></div>
+        <div class="author">${sourceIcon(sourceOf(b))}<b>${esc(b.authorName || b.author)}</b><span>${esc(handle(b))}</span></div>
         <div class="snippet">${esc(b.note || b.text) || "&nbsp;"}</div>
         ${folder ? `<div class="folder-tag">${esc(folder)}</div>` : ""}
       </div>`;
@@ -417,7 +433,7 @@ function cardMenu(b, x, y) {
   const ids = state.selected.has(b.id) ? [...state.selected] : [b.id];
   const many = ids.length > 1;
   openMenu(x, y, [
-    ...(many ? [] : [{ label: "Ouvrir", run: () => openViewer([b.id], 0) }, { label: "Ouvrir sur X", run: () => run(call("OpenPost", b.id)) }, { label: "Explorateur", run: () => call("Reveal", b.id) }]),
+    ...(many ? [] : [{ label: "Ouvrir", run: () => openViewer([b.id], 0) }, { label: `Ouvrir sur ${sources[sourceOf(b)].name}`, run: () => run(call("OpenPost", b.id)) }, { label: "Explorateur", run: () => call("Reveal", b.id) }]),
     { label: many ? `Exporter (${ids.length})` : "Exporter", run: () => exportIds(ids) },
     ...(many
       ? []
@@ -482,8 +498,18 @@ async function deleteIds(ids) {
 
 // --- Adding -------------------------------------------------------------------
 
-const looksLikePost = (s) => /\/status(es)?\/\d+/i.test(s) || /^\d{6,}$/.test(s.trim());
-const postID = (s) => s.match(/\/status(?:es)?\/(\d+)/i)?.[1] ?? (/^\d+$/.test(s) ? s : null);
+// Same as parsePostID in Go: the tweet ID, "yt-" or "ig-" and the site's ID.
+const youtubeID = /(?:youtube\.com\/(?:shorts\/|live\/|embed\/|watch\?(?:[^#]*&)?v=)|youtu\.be\/)([\w-]{11})/i;
+const instagramCode = /instagram\.com\/(?:[\w.]+\/)?(?:p|reels?|tv)\/([\w-]{5,})/i;
+const looksLikePost = (s) => /\/status(es)?\/\d+/i.test(s) || /^\d{6,}$/.test(s.trim()) || youtubeID.test(s) || instagramCode.test(s);
+function postID(s) {
+  const yt = s.match(youtubeID)?.[1];
+  if (yt) return "yt-" + yt;
+  const ig = s.match(instagramCode)?.[1];
+  if (ig) return "ig-" + ig;
+  return s.match(/\/status(?:es)?\/(\d+)/i)?.[1] ?? (/^\d+$/.test(s) ? s : null);
+}
+const sourceOfID = (id) => (id?.startsWith("yt-") ? "youtube" : id?.startsWith("ig-") ? "instagram" : id ? "x" : "");
 
 async function add(url) {
   url = url.trim();
@@ -492,11 +518,11 @@ async function add(url) {
   const dup = state.bookmarks.find((b) => b.id === id);
   if (dup) {
     const where = dup.folderId ? folderName(dup.folderId) : "Non classés";
-    return toast(`Déjà enregistré : @${dup.author} (${where}). Cliquer pour l'ouvrir`, true, () => openViewer([dup.id], 0));
+    return toast(`Déjà enregistré : ${dup.authorName || dup.author} sur ${sources[sourceOf(dup)].name} (${where}). Cliquer pour l'ouvrir`, true, () => openViewer([dup.id], 0));
   }
   if (id && state.pending.some((p) => p.id === id && !p.error)) return toast("Déjà en cours de téléchargement", true);
   const folderId = state.view.type === "folder" ? state.view.id : "";
-  const p = { key: Math.random(), url, id };
+  const p = { key: Math.random(), url, id, source: sourceOfID(id) };
   state.pending.unshift(p);
   renderGrid();
   try {
@@ -504,7 +530,7 @@ async function add(url) {
     state.pending = state.pending.filter((x) => x !== p);
     if (state.view.type === "fav") await call("SetFavorite", b.id, true);
     apply(await call("List"));
-    toast(`@${b.author} : ${b.media.length} média${b.media.length > 1 ? "s" : ""}`);
+    toast(`${sources[sourceOf(b)].name}, ${b.authorName || b.author} : ${b.media.length} média${b.media.length > 1 ? "s" : ""}`);
   } catch (e) {
     p.error = errText(e);
     renderGrid();
@@ -581,8 +607,10 @@ function renderViewer() {
   $("#v-prev").style.visibility = hasPrev ? "" : "hidden";
   $("#v-next").style.visibility = hasNext ? "" : "hidden";
 
+  const src = sourceOf(b);
   $("#v-name").textContent = b.authorName || b.author;
-  $("#v-handle").textContent = "@" + b.author;
+  $("#v-handle").innerHTML = `${sourceIcon(src)}<span>${esc([handle(b), sources[src].name].filter(Boolean).join(" · "))}</span>`;
+  $("#v-open").textContent = `Ouvrir sur ${sources[src].name}`;
   $("#v-text").textContent = b.text;
   $("#v-posted").textContent = fmtDate(b.postedAt);
   $("#v-added").textContent = fmtDate(b.addedAt);
@@ -760,6 +788,16 @@ $("#new-folder").innerHTML = icons.plus;
 $("#new-folder").onclick = newFolder;
 $("#search").oninput = (e) => {
   state.search = e.target.value;
+  renderGrid();
+};
+$("#source-filter").innerHTML =
+  `<button data-source="" class="on">Tout</button>` +
+  Object.entries(sources).map(([k, s]) => `<button data-source="${k}" title="${s.name}" aria-label="${s.name}">${sourceIcon(k)}</button>`).join("");
+$("#source-filter").onclick = (e) => {
+  const btn = e.target.closest("button");
+  if (!btn) return;
+  state.source = btn.dataset.source;
+  for (const b of $("#source-filter").children) b.classList.toggle("on", b === btn);
   renderGrid();
 };
 $("#kind-filter").onclick = (e) => {
