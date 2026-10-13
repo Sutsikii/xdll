@@ -31,6 +31,7 @@ type Media struct {
 // Bookmark is a saved post and its media.
 type Bookmark struct {
 	ID         string    `json:"id"`
+	Source     string    `json:"source,omitempty"` // "x" or "youtube"; X when empty (older posts)
 	URL        string    `json:"url"`
 	Author     string    `json:"author"`
 	AuthorName string    `json:"authorName"`
@@ -151,7 +152,7 @@ func (l *Library) List() Snapshot {
 
 // Add downloads the media of the post at url into folderID.
 func (l *Library) Add(ctx context.Context, url, folderID string) (Bookmark, error) {
-	id, err := parseTweetID(url)
+	id, err := parsePostID(url)
 	if err != nil {
 		return Bookmark{}, err
 	}
@@ -172,7 +173,7 @@ func (l *Library) Add(ctx context.Context, url, folderID string) (Bookmark, erro
 		l.mu.Unlock()
 	}()
 
-	t, err := fetchTweet(ctx, id)
+	t, err := fetchPost(ctx, id)
 	if err != nil {
 		return Bookmark{}, err
 	}
@@ -184,12 +185,12 @@ func (l *Library) Add(ctx context.Context, url, folderID string) (Bookmark, erro
 		return Bookmark{}, err
 	}
 	b := Bookmark{
-		ID: id, URL: t.URL, Author: t.Author, AuthorName: t.AuthorName,
+		ID: id, Source: t.Source, URL: t.URL, Author: t.Author, AuthorName: t.AuthorName,
 		Text: t.Text, PostedAt: t.Created, AddedAt: time.Now().UTC(), FolderID: folderID,
 	}
 	for i, m := range t.Media {
 		name := strconv.Itoa(i+1) + extOf(m.URL, m.Kind)
-		n, err := download(ctx, m.URL, filepath.Join(dir, name))
+		n, err := downloadMedia(ctx, m, filepath.Join(dir, name))
 		if err != nil {
 			os.RemoveAll(dir)
 			return Bookmark{}, err

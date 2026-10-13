@@ -18,11 +18,12 @@ import (
 	"time"
 )
 
-// tweet is a post as the public APIs describe it.
-type tweet struct {
-	ID         string
+// post is a post as the public APIs describe it.
+type post struct {
+	ID         string // the bookmark ID: the tweet ID, or "yt-" and the video's
+	Source     string // "x" or "youtube"
 	URL        string
-	Author     string // screen name, without @
+	Author     string // screen name or handle, without @
 	AuthorName string
 	Text       string
 	Created    time.Time
@@ -31,11 +32,13 @@ type tweet struct {
 
 // remoteMedia is a photo, video or GIF not downloaded yet.
 type remoteMedia struct {
-	Kind   string // "image", "video" or "gif"
-	URL    string // the best quality file
-	Thumb  string // a poster image, for videos and GIFs
-	Width  int
-	Height int
+	Kind     string // "image", "video" or "gif"
+	URL      string // the best quality file
+	Audio    string // the sound of URL, to merge, when served apart
+	Fallback string // a file with both, when merging fails
+	Thumb    string // a poster image, for videos and GIFs
+	Width    int
+	Height   int
 }
 
 var statusID = regexp.MustCompile(`(?i)/status(?:es)?/(\d+)`)
@@ -77,7 +80,7 @@ func getJSON(ctx context.Context, u string, v any) error {
 }
 
 // fetchTweet tries the syndication API, then FxTwitter.
-func fetchTweet(ctx context.Context, id string) (*tweet, error) {
+func fetchTweet(ctx context.Context, id string) (*post, error) {
 	t, err := fetchSyndication(ctx, id)
 	if err == nil && len(t.Media) > 0 {
 		return t, nil
@@ -111,7 +114,7 @@ func syndicationToken(id string) string {
 	return s
 }
 
-func fetchSyndication(ctx context.Context, id string) (*tweet, error) {
+func fetchSyndication(ctx context.Context, id string) (*post, error) {
 	var r struct {
 		Typename  string `json:"__typename"`
 		IDStr     string `json:"id_str"`
@@ -147,8 +150,9 @@ func fetchSyndication(ctx context.Context, id string) (*tweet, error) {
 	if r.IDStr == "" {
 		return nil, fmt.Errorf("syndication : %s", cmpOr(r.Typename, "réponse vide"))
 	}
-	t := &tweet{
+	t := &post{
 		ID:         r.IDStr,
+		Source:     "x",
 		Author:     r.User.ScreenName,
 		AuthorName: r.User.Name,
 		Text:       cmpOr(r.NoteTweet.Text, r.Text),
@@ -182,7 +186,7 @@ func fetchSyndication(ctx context.Context, id string) (*tweet, error) {
 	return t, nil
 }
 
-func fetchFx(ctx context.Context, id string) (*tweet, error) {
+func fetchFx(ctx context.Context, id string) (*post, error) {
 	var r struct {
 		Code    int    `json:"code"`
 		Message string `json:"message"`
@@ -212,8 +216,9 @@ func fetchFx(ctx context.Context, id string) (*tweet, error) {
 	if r.Code != 200 {
 		return nil, fmt.Errorf("fxtwitter : %s", r.Message)
 	}
-	t := &tweet{
+	t := &post{
 		ID:         r.Tweet.ID,
+		Source:     "x",
 		URL:        r.Tweet.URL,
 		Author:     r.Tweet.Author.ScreenName,
 		AuthorName: r.Tweet.Author.Name,
@@ -259,31 +264,22 @@ var tco = regexp.MustCompile(`\s*https://t\.co/\w+\s*$`)
 
 func stripMediaLinks(s string) string { return strings.TrimSpace(tco.ReplaceAllString(s, "")) }
 
-func postURL(t *tweet) string {
+func postURL(t *post) string {
 	return "https://x.com/" + cmpOr(t.Author, "i") + "/status/" + t.ID
 }
 
 // download writes u to dst through a temporary file.
 func download(ctx context.Context, u, dst string) (int64, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
-	if err != nil {
-		return 0, err
-	}
-	req.Header.Set("User-Agent", userAgent)
-	dl := &http.Client{} // no timeout for large videos
-	res, err := dl.Do(req)
-	if err != nil {
-		return 0, err
-	}
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		return 0, fmt.Errorf("téléchargement de %s : HTTP %d", u, res.StatusCode)
-	}
 	tmp, err := os.CreateTemp(filepath.Dir(dst), ".part-*")
 	if err != nil {
 		return 0, err
 	}
-	n, err := io.Copy(tmp, res.Body)
+	var n int64
+	if p, perr := url.Parse(u); perr == nil && strings.HasSuffix(p.Host, ".googlevideo.com") {
+		n, err = getRanges(ctx, u, tmp)
+	} else {
+		n, err = getRange(ctx, u, -1, tmp)
+	}
 	if cerr := tmp.Close(); err == nil {
 		err = cerr
 	}
@@ -295,6 +291,52 @@ func download(ctx context.Context, u, dst string) (int64, error) {
 		return 0, err
 	}
 	return n, nil
+}
+
+var dl = &http.Client{} // no timeout for large videos
+
+// getRange writes u to w from byte from, or all of it when from is -1.
+func getRange(ctx context.Context, u string, from int64, w io.Writer) (int64, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
+	if err != nil {
+		return 0, err
+	}
+	req.Header.Set("User-Agent", userAgent)
+	want := http.StatusOK
+	if from >= 0 {
+		req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", from, from+rangeSize-1))
+		want = http.StatusPartialContent
+	}
+	res, err := dl.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer res.Body.Close()
+	if res.StatusCode == http.StatusRequestedRangeNotSatisfiable {
+		return 0, io.EOF
+	}
+	if res.StatusCode != want {
+		return 0, fmt.Errorf("téléchargement de %s : HTTP %d", u, res.StatusCode)
+	}
+	return io.Copy(w, res.Body)
+}
+
+// rangeSize is the size of the parts of a YouTube stream: it slows down
+// whole downloads to the playback speed, not parts.
+const rangeSize = 10 << 20
+
+func getRanges(ctx context.Context, u string, w io.Writer) (int64, error) {
+	var total int64
+	for {
+		n, err := getRange(ctx, u, total, w)
+		total += n
+		if err == io.EOF || (err == nil && n < rangeSize) {
+			return total, nil
+		}
+		if err != nil {
+			return 0, err
+		}
+	}
 }
 
 // extOf returns the file extension of a media URL.

@@ -305,12 +305,6 @@ func mediaFiles(b Bookmark) []string {
 	return out
 }
 
-// validID reports whether id is a post ID, safe to use as a directory name.
-func validID(id string) bool {
-	_, err := strconv.ParseUint(id, 10, 64)
-	return err == nil
-}
-
 func readAll(f *zip.File) ([]byte, error) {
 	r, err := f.Open()
 	if err != nil {
