@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -143,5 +144,50 @@ func TestNetworkEconomy(t *testing.T) {
 		if ma.Light || !mb.Light || mb.Size >= ma.Size {
 			t.Errorf("%s: economy not lighter", u)
 		}
+	}
+}
+
+// XDLL_NET=1 go test -run Network: Optimize makes maximum quality videos lighter.
+func TestNetworkOptimize(t *testing.T) {
+	if os.Getenv("XDLL_NET") == "" {
+		t.Skip("set XDLL_NET=1")
+	}
+	l, err := OpenLibrary(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, u := range []string{
+		"https://x.com/i/status/2108580996761493865",
+		"https://www.youtube.com/shorts/1dnMj4UqaLk",
+		"https://www.instagram.com/reel/DWAUs7jANkM/", // left as it is
+	} {
+		if _, err := l.Add(context.Background(), u, "", QualityMax); err != nil {
+			t.Fatalf("%s: %v", u, err)
+		}
+	}
+	before := l.List().Bookmarks
+	st, err := l.Optimize(context.Background())
+	if err != nil || st.Total != 2 || st.Done != 2 || st.Failed != 0 || st.Saved <= 0 {
+		t.Fatalf("Optimize = %+v, %v", st, err)
+	}
+	for i, b := range l.List().Bookmarks {
+		m, old := b.Media[0], before[i].Media[0]
+		st, err := os.Stat(filepath.Join(l.mediaDir(), m.File))
+		if err != nil || st.Size() != m.Size {
+			t.Errorf("%s: %v %v", m.File, st, err)
+		}
+		t.Logf("%s: %d -> %d bytes, %dx%d", b.ID, old.Size, m.Size, m.Width, m.Height)
+		if b.Source != "instagram" && (!m.Light || m.Size >= old.Size) {
+			t.Errorf("%s not lighter", b.ID)
+		}
+		entries, _ := os.ReadDir(filepath.Join(l.mediaDir(), b.ID))
+		for _, e := range entries {
+			if n := e.Name(); strings.HasPrefix(n, ".") || strings.Contains(n, ".light") || strings.HasSuffix(n, ".part") {
+				t.Errorf("left %s/%s", b.ID, n)
+			}
+		}
+	}
+	if ids := l.heavyPosts(); len(ids) != 0 {
+		t.Errorf("still heavy: %v", ids)
 	}
 }

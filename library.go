@@ -65,6 +65,7 @@ type Library struct {
 	missing  string                 // the chosen directory, when it was not found at launch
 	data     Snapshot
 	inflight map[string]bool
+	opt      optimizer
 }
 
 // OpenLibrary loads or creates the library in dir.

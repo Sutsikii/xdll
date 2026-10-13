@@ -676,6 +676,7 @@ async function openSettings() {
   render();
   showSettings(await run(call("Settings")));
   showUpdates(await run(call("Updates")));
+  if ((await run(call("OptimizeStatus")))?.running) watchOptimize();
 }
 
 function showQuality() {
@@ -688,6 +689,66 @@ for (const r of document.querySelectorAll('input[name="quality"]')) {
   };
 }
 showQuality();
+
+// --- Lighter library ---
+
+// Videos economy could make lighter: Instagram has a single version.
+const heavyVideos = () =>
+  state.bookmarks.filter((b) => sourceOf(b) !== "instagram").flatMap((b) => b.media.filter((m) => m.kind === "video" && !m.light));
+
+let optimizing = false;
+
+function renderOptimize() {
+  if (optimizing) return;
+  const videos = heavyVideos();
+  const size = videos.reduce((n, m) => n + (m.size || 0), 0);
+  $("#opt-text").textContent = videos.length
+    ? `${videos.length} vidéo${videos.length > 1 ? "s" : ""} X ou YouTube en qualité maximale (${fmtSize(size)}). ` +
+      "Chacune est re-téléchargée en version économie, gardée si elle est plus légère. Celles qui ne sont plus en ligne restent telles quelles."
+    : "Toutes les vidéos sont en version économie.";
+  $("#optimize").disabled = !videos.length;
+}
+
+async function optimize() {
+  const n = heavyVideos().length;
+  const ok = await ask({
+    title: "Alléger la bibliothèque ?",
+    text: `${n} vidéo${n > 1 ? "s" : ""} en qualité maximale ser${n > 1 ? "ont remplacées" : "a remplacée"} par la version économie.`,
+    ok: "Alléger",
+  });
+  if (!ok) return;
+  run(call("Optimize"));
+  watchOptimize();
+}
+
+// watchOptimize shows the progress of Optimize until it ends.
+async function watchOptimize() {
+  if (optimizing) return;
+  optimizing = true;
+  $("#optimize").hidden = true;
+  $("#optimize-cancel").hidden = false;
+  $("#opt-progress").hidden = false;
+  let st;
+  let done = -1;
+  do {
+    await new Promise((r) => setTimeout(r, 400));
+    st = await call("OptimizeStatus");
+    $("#opt-progress i").style.width = (st.total ? (100 * st.done) / st.total : 100) + "%";
+    $("#opt-status").textContent = `${st.done} / ${st.total} posts · ${fmtSize(Math.max(st.saved, 1024))} libérés`;
+    if (st.done !== done) {
+      done = st.done;
+      apply(await call("List"));
+    }
+  } while (st.running);
+  optimizing = false;
+  $("#optimize").hidden = false;
+  $("#optimize-cancel").hidden = true;
+  $("#opt-progress").hidden = true;
+  $("#opt-status").textContent = "";
+  renderOptimize();
+  const left = st.failed ? `, ${st.failed} post${st.failed > 1 ? "s" : ""} laissé${st.failed > 1 ? "s" : ""} tel${st.failed > 1 ? "s" : ""} quel${st.failed > 1 ? "s" : ""}` : "";
+  toast((st.done < st.total ? "Arrêté : " : "") + `${fmtSize(Math.max(st.saved, 1024))} libérés` + left);
+}
 
 function closeSettings() {
   state.settings = false;
@@ -725,6 +786,7 @@ function renderStorage() {
   $("#st-sources").innerHTML = present
     .map((k) => `<span>${sourceIcon(k)}${sources[k].name} <small>${bySource[k].posts} post${bySource[k].posts > 1 ? "s" : ""} · ${sizeText(bySource[k].size)}</small></span>`)
     .join("");
+  renderOptimize();
   $("#st-kinds").innerHTML = [["image", "Images"], ["video", "Vidéos"], ["gif", "GIF"]]
     .filter(([k]) => byKind[k])
     .map(([k, label]) => `<span>${label} : ${byKind[k].n} · ${sizeText(byKind[k].size)}</span>`)
@@ -828,6 +890,8 @@ async function restore(replace) {
 $("#open-settings").innerHTML = `${icons.gear}<span class="label">Paramètres</span>`;
 $("#open-settings").onclick = openSettings;
 $("#backup").onclick = backup;
+$("#optimize").onclick = optimize;
+$("#optimize-cancel").onclick = () => call("CancelOptimize");
 $("#restore-merge").onclick = () => restore(false);
 $("#restore-replace").onclick = () => restore(true);
 $("#auto-check").onchange = setUpdates;
