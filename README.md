@@ -15,6 +15,7 @@ Faite avec [MyGo](https://github.com/egoist/mygo) (Go + WebView2).
 - Dossiers et sous-dossiers (clic droit → Nouveau sous-dossier, ou glisser un dossier sur un autre), favoris, notes
 - Recherche, filtre par type, tri
 - Sélection multiple, export, suppression
+- Clic droit sur un post, le fond, la visionneuse ou la barre latérale : les actions utiles là où on clique (copier le fichier pour le coller dans l'Explorateur ou une discussion, déplacer, favori, tri…)
 - Copier pour Claude : texte du post (avec les chemins des fichiers), image, ou les deux
 - Paramètres (en bas à gauche) : thème clair, sombre ou celui de Windows, place prise par site et par type, qualité des vidéos, sauvegarde et import de toute la bibliothèque
 
