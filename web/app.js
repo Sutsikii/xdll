@@ -22,6 +22,8 @@ const icons = {
   play: svg('<path fill="currentColor" d="M7 4v16l13-8z"/>'),
   image: svg('<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/>'),
   gear: svg('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'),
+  link: svg('<path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1"/>'),
+  search: svg('<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>'),
   check: svg('<path d="M20 6 9 17l-5-5"/>', 'stroke-width="3"'),
   x: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.24 2.25h3.31l-7.23 8.26 8.5 11.24h-6.65l-5.21-6.82-5.97 6.82H1.68l7.73-8.84L1.25 2.25h6.83l4.71 6.23zm-1.16 17.52h1.83L7.08 4.13H5.12z"/></svg>',
   youtube: '<svg viewBox="0 0 24 24"><rect x="1.5" y="4.5" width="21" height="15" rx="4.5" fill="currentColor"/><path d="M10 8.8v6.4l5.5-3.2z" fill="#fff"/></svg>',
@@ -431,8 +433,8 @@ function renderGrid() {
   grid.hidden = cards.length === 0;
   if (!cards.length) {
     empty.innerHTML = state.bookmarks.length
-      ? `<b>Aucun résultat</b>`
-      : `<b>Aucun post</b>`;
+      ? `<span class="empty-icon">${icons.search}</span><b>Aucun résultat</b><p>Aucun post ne correspond à ces filtres.</p>`
+      : `<span class="empty-icon">${icons.link}</span><b>Aucun post</b><p>Colle le lien d'un post X, Instagram ou d'une vidéo YouTube avec <kbd>Ctrl</kbd> <kbd>V</kbd>, ou glisse-le ici.</p>`;
   }
 }
 
@@ -919,6 +921,8 @@ $("#open-data-dir").onclick = () => run(call("OpenDataDir"));
 // --- Toolbar and keyboard ----------------------------------------------------------
 
 $("#new-folder").innerHTML = icons.plus;
+$("#add-form").insertAdjacentHTML("afterbegin", icons.link);
+$(".search").insertAdjacentHTML("afterbegin", icons.search);
 $("#new-folder").onclick = newFolder;
 $("#search").oninput = (e) => {
   state.search = e.target.value;
