@@ -629,6 +629,35 @@ function cardMenu(b, x, y) {
   ]);
 }
 
+// gridMenu is the menu of the library's background.
+async function gridMenu(x, y) {
+  const folder = state.view.type === "folder" ? state.view.id : "";
+  const list = visible();
+  const links = String((await run(call("ClipboardText"))) ?? "").split(/\s+/).filter(looksLikePost);
+  openMenu(x, y, [
+    {
+      label: links.length > 1 ? `Coller ${links.length} liens` : "Coller le lien",
+      hint: "Ctrl+V",
+      disabled: !links.length,
+      run: () => links.forEach(add),
+    },
+    "-",
+    { label: folder ? "Nouveau sous-dossier" : "Nouveau dossier", run: () => newFolder(folder, []) },
+    { label: "Tout sélectionner", hint: "Ctrl+A", disabled: !list.length, run: selectAll },
+    { label: list.length > 1 ? `Exporter ces ${list.length} posts` : list.length ? "Exporter ce post" : "Exporter", disabled: !list.length, run: () => exportIds(list.map((b) => b.id)) },
+    "-",
+    {
+      label: "Trier par",
+      items: [...$("#sort").options].map((o) => ({ label: o.text, checked: state.sort === o.value, run: () => setSort(o.value) })),
+    },
+  ]);
+}
+
+function selectAll() {
+  visible().forEach((b) => state.selected.add(b.id));
+  render();
+}
+
 // moveItems lists the folders to file ids in, checking the one they are in.
 function moveItems(ids) {
   const at = new Set(ids.map((id) => postOf(id)?.folderId || ""));
@@ -1170,10 +1199,16 @@ $("#kind-filter").onclick = (e) => {
   renderGrid();
 };
 $("#sort").value = state.sort;
-$("#sort").onchange = (e) => {
-  state.sort = e.target.value;
+function setSort(sort) {
+  state.sort = $("#sort").value = sort;
   savePrefs();
   renderGrid();
+}
+$("#sort").onchange = (e) => setSort(e.target.value);
+$(".main").oncontextmenu = (e) => {
+  if (e.defaultPrevented || e.target.closest("input, select, textarea, button, .selection-bar")) return;
+  e.preventDefault();
+  gridMenu(e.clientX, e.clientY);
 };
 const zoom = (px) => document.documentElement.style.setProperty("--thumb", px + "px");
 $("#zoom").value = prefs.zoom;
@@ -1230,8 +1265,7 @@ addEventListener("keydown", (e) => {
     render();
   } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "a") {
     e.preventDefault();
-    visible().forEach((b) => state.selected.add(b.id));
-    render();
+    selectAll();
   } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") {
     e.preventDefault();
     $("#search").focus();
