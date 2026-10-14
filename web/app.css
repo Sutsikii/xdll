@@ -359,8 +359,19 @@ input { user-select: text; }
   background: var(--raised); border: 1px solid var(--line); border-radius: 14px;
   box-shadow: var(--shadow-lg); animation: fade .1s ease;
 }
-.menu button { display: flex; width: 100%; height: 32px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; box-shadow: none; font-weight: 400; }
-.menu button:hover { background: var(--hover); }
+.menu button {
+  display: flex; align-items: center; gap: 10px; width: 100%; height: 32px; padding: 0 10px;
+  border: 0; border-radius: 8px; background: transparent; box-shadow: none; font-weight: 400;
+}
+.menu button:hover:not(:disabled), .menu button.open { background: var(--hover); }
+.menu button:disabled { opacity: .45; cursor: default; }
+.menu .text { flex: 1; min-width: 0; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.menu .mark { display: none; flex: none; width: 14px; }
+.menu.checks .mark { display: grid; place-items: center; }
+.menu .mark svg { width: 13px; height: 13px; }
+.menu button > svg { flex: none; width: 14px; height: 14px; margin-right: -4px; color: var(--muted); }
+.menu kbd { font: inherit; font-size: 11.5px; color: var(--faint); margin-left: 12px; }
+#submenu { max-width: 320px; }
 .menu button.danger:hover { background: color-mix(in srgb, var(--danger) 10%, transparent); }
 .menu hr { border: 0; border-top: 1px solid var(--line); margin: 5px 4px; }
 .toasts { position: fixed; right: 20px; bottom: 20px; z-index: 60; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }

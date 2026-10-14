@@ -66,3 +66,30 @@ func TestClipboardForClaude(t *testing.T) {
 		}
 	}
 }
+
+func TestClipboardFiles(t *testing.T) {
+	if os.Getenv("XDLL_CLIP") == "" {
+		t.Skip("set XDLL_CLIP=1")
+	}
+	l, err := OpenLibrary(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	fakePost(t, l, "1", "")
+	fakePost(t, l, "2", "")
+	if n, err := l.CopyFiles([]string{"1", "2"}, -1); err != nil || n != 2 {
+		t.Fatalf("CopyFiles: %d %v", n, err)
+	}
+	if err := mygo.Clipboard.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	files := powershell(t, "Get-Clipboard -Format FileDropList | ForEach-Object { $_.Name }")
+	if files != "1.jpg\r\n1.jpg" && files != "1.jpg\n1.jpg" {
+		t.Errorf("files on the clipboard: %q", files)
+	}
+
+	powershell(t, "Set-Clipboard -Value 'https://x.com/a/status/1'")
+	if got := l.ClipboardText(); got != "https://x.com/a/status/1" {
+		t.Errorf("ClipboardText: %q", got)
+	}
+}

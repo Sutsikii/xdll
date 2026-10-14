@@ -106,6 +106,7 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "
 const mediaURL = (file) => "/media/" + file.split("/").map(encodeURIComponent).join("/");
 const folderOf = (id) => (id ? state.folders.find((f) => f.id === id) : undefined);
 const folderName = (id) => folderOf(id)?.name;
+const postOf = (id) => state.bookmarks.find((b) => b.id === id);
 // The parents of a folder, from the top, and the folder. The Go side
 // removes cycles; the bound guards against a bad library anyway.
 function folderAncestors(id) {
@@ -199,30 +200,78 @@ function ask({ title, text = "", value = null, ok = "OK", danger = false }) {
   });
 }
 
+// openMenu shows a menu at x, y. An item is "-" (a separator) or
+// { label, run, danger, disabled, hint (a shortcut), checked (true or false
+// for an item that can be checked), items (a submenu) }.
 function openMenu(x, y, items) {
-  const menu = $("#menu");
+  closeMenus();
+  fillMenu($("#menu"), items);
+  placeMenu($("#menu"), x, y);
+}
+
+function fillMenu(menu, items) {
   menu.innerHTML = "";
+  menu.classList.toggle("checks", items.some((i) => i.checked !== undefined));
   for (const item of items) {
     if (item === "-") {
       menu.append(document.createElement("hr"));
       continue;
     }
     const b = document.createElement("button");
-    b.textContent = item.label;
-    if (item.danger) b.className = "danger";
-    b.onclick = () => {
-      menu.hidden = true;
-      item.run();
-    };
+    b.className = item.danger ? "danger" : "";
+    b.disabled = !!item.disabled;
+    b.innerHTML =
+      `<span class="mark">${item.checked ? icons.check : ""}</span><span class="text">${esc(item.label)}</span>` +
+      (item.hint ? `<kbd>${esc(item.hint)}</kbd>` : "") +
+      (item.items ? icons.right : "");
+    if (item.items) {
+      b.classList.add("sub");
+      b.onmouseenter = b.onclick = () => openSubmenu(b, item.items);
+    } else {
+      if (menu.id === "menu") b.onmouseenter = () => closeSubmenu();
+      b.onclick = () => {
+        closeMenus();
+        item.run();
+      };
+    }
     menu.append(b);
   }
+}
+
+// placeMenu shows menu at x, y, or at altX when it does not fit on the right.
+function placeMenu(menu, x, y, altX = innerWidth) {
   menu.hidden = false;
   const r = menu.getBoundingClientRect();
-  menu.style.left = Math.min(x, innerWidth - r.width - 8) + "px";
-  menu.style.top = Math.min(y, innerHeight - r.height - 8) + "px";
+  const left = x + r.width <= innerWidth - 8 ? x : Math.min(altX - r.width, innerWidth - r.width - 8);
+  menu.style.left = Math.max(8, left) + "px";
+  menu.style.top = Math.max(8, Math.min(y, innerHeight - r.height - 8)) + "px";
 }
-addEventListener("mousedown", (e) => !e.target.closest("#menu") && ($("#menu").hidden = true), true);
-addEventListener("blur", () => ($("#menu").hidden = true));
+
+function openSubmenu(button, items) {
+  const sub = $("#submenu");
+  if (sub.owner === button && !sub.hidden) return;
+  closeSubmenu();
+  sub.owner = button;
+  button.classList.add("open");
+  fillMenu(sub, items);
+  const r = button.getBoundingClientRect();
+  placeMenu(sub, r.right + 4, r.top - 7, r.left - 4);
+}
+
+function closeSubmenu() {
+  const sub = $("#submenu");
+  sub.owner?.classList.remove("open");
+  sub.owner = null;
+  sub.hidden = true;
+}
+
+function closeMenus() {
+  closeSubmenu();
+  $("#menu").hidden = true;
+}
+const menuOpen = () => !$("#menu").hidden;
+addEventListener("mousedown", (e) => !e.target.closest(".menu") && closeMenus(), true);
+addEventListener("blur", closeMenus);
 
 // The browser's menu (Back, Reload, Print, Inspect) has no place in the app,
 // and Reload stops downloads. Text fields and selected text keep it, for cut,
@@ -418,13 +467,14 @@ function folderMenu(f, x, y) {
   ]);
 }
 
-async function newFolder(parent = "") {
+// newFolder creates a folder in parent, files ids in it and opens it.
+async function newFolder(parent = "", ids = [...state.selected]) {
   const name = await ask({ title: parent ? "Nouveau sous-dossier" : "Nouveau dossier", text: parent ? `Dans ${folderPath(parent)}` : "", value: "", ok: "Créer" });
   if (name === null) return;
   const f = await run(call("CreateFolder", name, parent));
   if (!f) return;
   if (state.collapsed.delete(parent)) saveCollapsed();
-  if (state.selected.size) await run(call("Move", [...state.selected], f.id), apply);
+  if (ids.length) await run(call("Move", ids, f.id), apply);
   else apply(await call("List"));
   setView({ type: "folder", id: f.id });
 }
@@ -548,24 +598,67 @@ function renderGrid() {
 
 function cardMenu(b, x, y) {
   const ids = state.selected.has(b.id) ? [...state.selected] : [b.id];
-  const many = ids.length > 1;
+  const n = ids.length;
+  const many = n > 1;
+  const posts = ids.map(postOf).filter(Boolean);
+  const files = posts.reduce((s, p) => s + p.media.length, 0);
+  const fav = posts.every((p) => p.favorite);
   openMenu(x, y, [
-    ...(many ? [] : [{ label: "Ouvrir", run: () => openViewer([b.id], 0) }, { label: `Ouvrir sur ${sources[sourceOf(b)].name}`, run: () => run(call("OpenPost", b.id)) }, { label: "Explorateur", run: () => call("Reveal", b.id) }]),
-    { label: many ? `Exporter (${ids.length})` : "Exporter", run: () => exportIds(ids) },
     ...(many
       ? []
       : [
+          { label: "Ouvrir", run: () => openViewer([b.id], 0) },
+          { label: `Ouvrir sur ${sources[sourceOf(b)].name}`, run: () => run(call("OpenPost", b.id)) },
+          { label: "Afficher dans l'Explorateur", run: () => call("Reveal", b.id) },
+          "-",
           { label: "Copier pour Claude", run: () => copyForClaude(b.id, 0, "all") },
           { label: "Copier le texte", run: () => copyForClaude(b.id, 0, "text") },
           { label: "Copier l'image", run: () => copyForClaude(b.id, 0, "image") },
         ]),
-    { label: "Copier le lien", run: () => copyLinks(ids) },
+    { label: files > 1 ? `Copier les fichiers (${files})` : "Copier le fichier", run: () => copyFiles(ids, -1) },
+    { label: many ? `Copier les liens (${n})` : "Copier le lien", run: () => copyLinks(ids) },
     "-",
-    { label: "Non classés", run: () => run(call("Move", ids, ""), apply) },
-    ...folderTree().map(({ f, depth }) => ({ label: indent(depth) + f.name, run: () => run(call("Move", ids, f.id), apply) })),
+    { label: fav ? "Retirer des favoris" : "Ajouter aux favoris", run: () => setFavorites(ids, !fav) },
+    { label: "Déplacer vers", items: moveItems(ids) },
+    many
+      ? { label: "Tout désélectionner", hint: "Échap", run: () => (state.selected.clear(), render()) }
+      : { label: state.selected.has(b.id) ? "Désélectionner" : "Sélectionner", run: () => toggleSelect(b.id) },
+    { label: many ? `Exporter (${n})` : "Exporter", run: () => exportIds(ids) },
     "-",
-    { label: many ? `Supprimer (${ids.length})` : "Supprimer", danger: true, run: () => deleteIds(ids) },
+    { label: many ? `Supprimer (${n})` : "Supprimer", danger: true, run: () => deleteIds(ids) },
   ]);
+}
+
+// moveItems lists the folders to file ids in, checking the one they are in.
+function moveItems(ids) {
+  const at = new Set(ids.map((id) => postOf(id)?.folderId || ""));
+  const only = at.size === 1 ? [...at][0] : null;
+  return [
+    { label: "Non classés", checked: only === "", run: () => moveTo(ids, "") },
+    ...folderTree().map(({ f, depth }) => ({ label: indent(depth) + f.name, checked: only === f.id, run: () => moveTo(ids, f.id) })),
+    "-",
+    { label: "Nouveau dossier…", run: () => newFolder(state.view.type === "folder" ? state.view.id : "", ids) },
+  ];
+}
+
+function moveTo(ids, folderId) {
+  run(call("Move", ids, folderId), (s) => {
+    apply(s);
+    toast(`Déplacé dans ${folderPath(folderId) || "Non classés"}`);
+  });
+}
+
+async function setFavorites(ids, favorite) {
+  let snap;
+  for (const id of ids) snap = await run(call("SetFavorite", id, favorite));
+  if (!snap) return;
+  apply(snap);
+  if (ids.length > 1) toast(favorite ? `${ids.length} posts ajoutés aux favoris` : `${ids.length} posts retirés des favoris`);
+}
+
+async function copyFiles(ids, index) {
+  const n = await run(call("CopyFiles", ids, index));
+  if (n) toast(n > 1 ? `${n} fichiers copiés : à coller dans l'Explorateur ou une discussion` : "Fichier copié : à coller dans l'Explorateur ou une discussion");
 }
 
 function toggleSelect(id) {
@@ -1105,6 +1198,10 @@ $("#selection-move").onchange = async (e) => {
 };
 
 addEventListener("keydown", (e) => {
+  if (menuOpen()) {
+    if (e.key === "Escape") closeMenus();
+    return;
+  }
   const typing = e.target.closest("input, textarea, select");
   if (!$("#dialog").hidden) return;
   if (state.settings) {

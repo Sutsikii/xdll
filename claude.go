@@ -40,14 +40,53 @@ func (l *Library) CopyForClaude(id string, index int, what string) (string, erro
 	if err != nil {
 		return "", err
 	}
-	// Another program may hold the clipboard open for a moment.
+	return copied, writeClipboard(data)
+}
+
+// CopyFiles puts the media files of posts on the clipboard, to paste them
+// in the explorer or a chat. index picks one media of a single post; -1
+// takes them all. It returns how many files were copied.
+func (l *Library) CopyFiles(ids []string, index int) (int, error) {
+	l.mu.Lock()
+	var paths []string
+	for _, id := range ids {
+		i := l.find(id)
+		if i < 0 {
+			continue
+		}
+		for j, m := range l.data.Bookmarks[i].Media {
+			if index < 0 || index == j {
+				paths = append(paths, filepath.Join(l.mediaDir(), filepath.FromSlash(m.File)))
+			}
+		}
+	}
+	l.mu.Unlock()
+	if len(paths) == 0 {
+		return 0, errors.New("aucun fichier")
+	}
+	data, err := transfer.FileData(paths...)
+	if err != nil {
+		return 0, err
+	}
+	return len(paths), writeClipboard(data)
+}
+
+// ClipboardText returns the text on the clipboard, "" when there is none.
+func (l *Library) ClipboardText() string {
+	b, _ := mygo.Clipboard.ReadFormat(transfer.Text)
+	return string(b)
+}
+
+// writeClipboard replaces the clipboard. Another program may hold it open
+// for a moment.
+func writeClipboard(data transfer.Data) error {
 	for try := 0; ; try++ {
 		err := mygo.Clipboard.Write(data)
 		if err == nil {
-			return copied, nil
+			return nil
 		}
 		if try == 9 {
-			return "", fmt.Errorf("presse-papier occupé : %w", err)
+			return fmt.Errorf("presse-papier occupé : %w", err)
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
