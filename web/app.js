@@ -420,9 +420,19 @@ function renderSidebar() {
   const n = (view) => state.bookmarks.filter((b) => inView(b, view)).length;
   const views = $("#views");
   views.replaceChildren(
-    navLink({ icon: icons.all, label: "Tout", count: state.bookmarks.length, on: v.type === "all", onClick: () => setView({ type: "all" }) }),
-    navLink({ icon: icons.star, label: "Favoris", count: n({ type: "fav" }), on: v.type === "fav", onClick: () => setView({ type: "fav" }) }),
-    navLink({ icon: icons.inbox, label: "Non classés", count: n({ type: "unfiled" }), on: v.type === "unfiled", onClick: () => setView({ type: "unfiled" }), folderId: "" }),
+    ...[
+      { type: "all", icon: icons.all, label: "Tout" },
+      { type: "fav", icon: icons.star, label: "Favoris" },
+      { type: "unfiled", icon: icons.inbox, label: "Non classés", folderId: "" },
+    ].map(({ type, ...link }) =>
+      navLink({
+        ...link,
+        count: n({ type }),
+        on: v.type === type,
+        onClick: () => setView({ type }),
+        onContext: (e) => viewMenu({ type }, e.clientX, e.clientY),
+      }),
+    ),
   );
   const folders = $("#folders");
   folders.replaceChildren(
@@ -454,6 +464,38 @@ function statsText() {
   const size = state.bookmarks.reduce((s, b) => s + totalSize(b), 0);
   const media = state.bookmarks.reduce((s, b) => s + b.media.length, 0);
   return `${state.bookmarks.length} posts · ${media} médias · ${fmtSize(size)}`;
+}
+
+// viewMenu is the menu of Tout, Favoris and Non classés.
+function viewMenu(view, x, y) {
+  const ids = state.bookmarks.filter((b) => inView(b, view)).map((b) => b.id);
+  const n = ids.length;
+  openMenu(x, y, [
+    { label: "Ouvrir", run: () => setView(view) },
+    { label: n > 1 ? `Copier les liens (${n})` : "Copier le lien", disabled: !n, run: () => copyLinks(ids) },
+    { label: n > 1 ? `Exporter (${n})` : "Exporter", disabled: !n, run: () => exportIds(ids) },
+  ]);
+}
+
+// foldersMenu is the menu of the folders' list, outside a folder.
+function foldersMenu(x, y) {
+  const parents = state.folders.filter((f) => subfolders(f.id).length);
+  const closed = parents.filter((f) => state.collapsed.has(f.id)).length;
+  const fold = (ids) => {
+    state.collapsed = new Set(ids);
+    saveCollapsed();
+    renderSidebar();
+  };
+  openMenu(x, y, [
+    { label: "Nouveau dossier", run: () => newFolder("", []) },
+    ...(parents.length
+      ? [
+          "-",
+          { label: "Tout déplier", disabled: !closed, run: () => fold([]) },
+          { label: "Tout replier", disabled: closed === parents.length, run: () => fold(parents.map((f) => f.id)) },
+        ]
+      : []),
+  ]);
 }
 
 function folderMenu(f, x, y) {
@@ -1207,6 +1249,12 @@ $("#add-form").insertAdjacentHTML("afterbegin", icons.link);
 $(".search").insertAdjacentHTML("afterbegin", icons.search);
 $("#new-folder").onclick = () => newFolder();
 dropTarget($("#folders-head"), "", false);
+for (const el of [$("#folders"), $("#folders-head")])
+  el.oncontextmenu = (e) => {
+    if (e.defaultPrevented) return;
+    e.preventDefault();
+    foldersMenu(e.clientX, e.clientY);
+  };
 $("#search").oninput = (e) => {
   state.search = e.target.value;
   renderGrid();
