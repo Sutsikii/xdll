@@ -103,6 +103,8 @@ func TestNetworkAdd(t *testing.T) {
 		"https://www.youtube.com/shorts/1dnMj4UqaLk",        // a Short, audio apart
 		"https://www.instagram.com/reel/DWAUs7jANkM/",       // a reel
 		"https://www.instagram.com/p/BsOGulcndj-/",          // a photo
+		"https://www.instagram.com/p/DcN0jjHMbqE/",          // a reel InstaFix gives as an image
+		"https://www.instagram.com/p/DePNLTuDHD9/",          // a carousel
 	}
 	for _, u := range urls {
 		b, err := l.Add(context.Background(), u, f.ID, QualityMax)
