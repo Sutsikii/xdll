@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.1
+
+- Les Paramètres prennent toute la largeur de la fenêtre, sur deux ou trois colonnes : beaucoup moins de défilement
+
 ## 0.6.0
 
 - Nouveau design, plus sobre : boutons noirs, titres en serif, cartes et fenêtres plus douces
