@@ -685,9 +685,27 @@ async function openSettings() {
   $(".main").hidden = true;
   $("#settings").hidden = false;
   render();
+  showTheme(await run(call("Theme")));
   showSettings(await run(call("Settings")));
   showUpdates(await run(call("Updates")));
   if ((await run(call("OptimizeStatus")))?.running) watchOptimize();
+}
+
+// --- Appearance ---
+
+const themes = { system: "Système", light: "Clair", dark: "Sombre" };
+// A small window of the app in that theme; the system's is half of each.
+const themeMock = (t) => `<span class="mock mock-${t}"><i class="m-side"></i><i class="m-card"><i></i><i></i><i class="m-btn"></i></i></span>`;
+$("#themes").innerHTML = Object.entries(themes)
+  .map(([k, label]) => `<label class="theme-choice"><input type="radio" name="theme" value="${k}" />
+    <span class="theme-preview">${k === "system" ? themeMock("light") + themeMock("dark") : themeMock(k)}</span><b>${label}</b></label>`)
+  .join("");
+function showTheme(t) {
+  if (!t) return;
+  for (const r of document.querySelectorAll('input[name="theme"]')) r.checked = r.value === t;
+}
+for (const r of document.querySelectorAll('input[name="theme"]')) {
+  r.onchange = async () => showTheme((await run(call("SetTheme", r.value))) ?? (await call("Theme")));
 }
 
 function showQuality() {

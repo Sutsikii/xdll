@@ -30,6 +30,7 @@ func main() {
 		log.Fatal(err)
 	}
 	mygo.Bind(lib)
+	mygo.Theme.SetSource(LoadTheme(dir))
 
 	// /media/ serves the library files, everything else the page.
 	page, _ := fs.Sub(web, "web")

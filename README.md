@@ -15,7 +15,7 @@ Faite avec [MyGo](https://github.com/egoist/mygo) (Go + WebView2).
 - Recherche, filtre par type, tri
 - Sélection multiple, export, suppression
 - Copier pour Claude : texte du post (avec les chemins des fichiers), image, ou les deux
-- Paramètres (en bas à gauche) : place prise par site et par type, qualité des vidéos, sauvegarde et import de toute la bibliothèque
+- Paramètres (en bas à gauche) : thème clair, sombre ou celui de Windows, place prise par site et par type, qualité des vidéos, sauvegarde et import de toute la bibliothèque
 
 Les médias restent sur le PC, même si le post est supprimé de X.
 
@@ -102,6 +102,7 @@ La clé qui signe les mises à jour est dans `%APPDATA%\mygo\update-keys\mygo-up
 | `backup.go` | sauvegarde et import (.zip) |
 | `update.go` | réglages des mises à jour |
 | `datadir.go` | choix du dossier des données |
+| `theme.go` | thème clair, sombre ou du système, retenu dans `%APPDATA%\xdll\theme.json` |
 | `web/` | interface (HTML, CSS, JS sans build) |
 
 ## Limites
