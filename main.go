@@ -51,7 +51,7 @@ func main() {
 			MinWidth:        720,
 			MinHeight:       480,
 			StateKey:        "main",
-			BackgroundColor: "light-dark(#f6f6f4, #141416)",
+			BackgroundColor: "light-dark(#f3f3f1, #111112)",
 			URL:             "/",
 		})
 	})
