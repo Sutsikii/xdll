@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.0
+
+- Clic droit : plus de menu de navigateur (Retour, Actualiser, Imprimer…), qui pouvait couper les téléchargements
+- Menu des posts : « Déplacer vers » en sous-menu avec le dossier actuel coché, favoris, sélection, et « Copier le fichier » pour le coller dans l'Explorateur ou une discussion
+- Clic droit sur le fond : coller le lien, nouveau dossier, tout sélectionner, exporter, trier
+- Clic droit dans la visionneuse : les actions sur le média affiché, avec leurs raccourcis
+- Clic droit dans la barre latérale : exporter Favoris ou Non classés, nouveau dossier, tout déplier ou replier
+
 ## 0.8.0
 
 - Sous-dossiers : clic droit sur un dossier → Nouveau sous-dossier, ou glisser un dossier sur un autre
