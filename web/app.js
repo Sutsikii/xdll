@@ -910,6 +910,36 @@ $("#v-reveal").onclick = () => call("Reveal", current().id);
 $("#v-file").onclick = () => run(call("OpenMedia", current().media[state.viewer.media].file));
 $("#v-export").onclick = () => exportIds([current().id]);
 $("#v-delete").onclick = () => deleteIds([current().id]);
+$(".viewer-stage").oncontextmenu = (e) => {
+  if (e.target.closest("button")) return;
+  e.preventDefault();
+  viewerMenu(e.clientX, e.clientY);
+};
+
+// viewerMenu acts on the media shown, not the post's first one.
+function viewerMenu(x, y) {
+  const b = current();
+  const i = state.viewer.media;
+  const m = b.media[i];
+  const image = m.kind === "image";
+  openMenu(x, y, [
+    { label: "Copier pour Claude", hint: "C", run: () => copyForClaude(b.id, i, "all") },
+    { label: "Copier le texte", hint: "T", run: () => copyForClaude(b.id, i, "text") },
+    { label: image ? "Copier l'image" : "Copier la miniature", hint: "I", disabled: !image && !m.thumb, run: () => copyForClaude(b.id, i, "image") },
+    { label: image ? "Copier le fichier" : m.kind === "gif" ? "Copier le GIF (MP4)" : "Copier la vidéo", run: () => copyFiles([b.id], i) },
+    { label: "Copier le lien", run: () => copyLinks([b.id]) },
+    "-",
+    { label: b.favorite ? "Retirer des favoris" : "Ajouter aux favoris", hint: "F", run: () => setFavorites([b.id], !b.favorite) },
+    { label: "Déplacer vers", items: moveItems([b.id]) },
+    "-",
+    { label: "Ouvrir le fichier", run: () => run(call("OpenMedia", m.file)) },
+    { label: "Afficher dans l'Explorateur", run: () => call("Reveal", b.id) },
+    { label: `Ouvrir sur ${sources[sourceOf(b)].name}`, run: () => run(call("OpenPost", b.id)) },
+    { label: "Exporter", run: () => exportIds([b.id]) },
+    "-",
+    { label: "Supprimer", hint: "Suppr", danger: true, run: () => deleteIds([b.id]) },
+  ]);
+}
 
 // --- Settings -------------------------------------------------------------------
 
