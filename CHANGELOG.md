@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.0
+
+- Nouveau design, plus sobre : boutons noirs, titres en serif, cartes et fenêtres plus douces
+- Thème clair, sombre ou celui de Windows (Paramètres → Apparence)
+- Le visualiseur suit le thème
+- Les vignettes ne sont plus écrasées dans la grille
+
 ## 0.5.1
 
 - Instagram : les reels que l'app enregistrait comme une image cassée se téléchargent en vraie vidéo, avec la légende, la date du post et une miniature
