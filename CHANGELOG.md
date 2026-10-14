@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.0
+
+- Sous-dossiers : clic droit sur un dossier → Nouveau sous-dossier, ou glisser un dossier sur un autre
+- Les dossiers s'affichent en arbre dans la barre latérale et se replient
+- Un dossier montre aussi les posts de ses sous-dossiers
+- Supprimer un dossier remonte ses posts et sous-dossiers dans le dossier parent
+
 ## 0.7.0
 
 - Épingles Pinterest : images, vidéos et épingles idées, depuis un lien pinterest.com/pin/… ou pin.it/…
