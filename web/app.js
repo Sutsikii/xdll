@@ -19,6 +19,7 @@ const icons = {
   close: svg('<path d="M18 6 6 18M6 6l12 12"/>'),
   left: svg('<path d="m15 18-6-6 6-6"/>'),
   right: svg('<path d="m9 18 6-6-6-6"/>'),
+  chevron: svg('<path d="m9 6 6 6-6 6"/>', 'stroke-width="2.4"'),
   play: svg('<path fill="currentColor" d="M7 4v16l13-8z"/>'),
   image: svg('<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/>'),
   gear: svg('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'),
@@ -60,7 +61,21 @@ const state = {
   pending: [], // { key, url, id, error }
   viewer: null, // { ids, pos, media }
   settings: false, // the settings page is shown instead of the library
+  collapsed: new Set(loadList("xdll.collapsed")), // folders whose subfolders are hidden
 };
+
+function loadList(key) {
+  try {
+    return JSON.parse(localStorage.getItem(key) || "[]");
+  } catch {
+    return [];
+  }
+}
+function saveCollapsed() {
+  try {
+    localStorage.setItem("xdll.collapsed", JSON.stringify([...state.collapsed]));
+  } catch {}
+}
 
 function load(key, fallback) {
   try {
@@ -89,7 +104,34 @@ function apply(snapshot) {
 const $ = (s, root = document) => root.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const mediaURL = (file) => "/media/" + file.split("/").map(encodeURIComponent).join("/");
-const folderName = (id) => state.folders.find((f) => f.id === id)?.name;
+const folderOf = (id) => (id ? state.folders.find((f) => f.id === id) : undefined);
+const folderName = (id) => folderOf(id)?.name;
+// The parents of a folder, from the top, and the folder. The Go side
+// removes cycles; the bound guards against a bad library anyway.
+function folderAncestors(id) {
+  const out = [];
+  for (let f = folderOf(id); f && out.length < 64; f = folderOf(f.parent)) out.unshift(f);
+  return out;
+}
+const folderPath = (id) => folderAncestors(id).map((f) => f.name).join(" / ");
+// isWithin reports whether folder id is ancestor or inside it.
+const isWithin = (id, ancestor) => folderAncestors(id).some((f) => f.id === ancestor);
+const subfolders = (id) => state.folders.filter((f) => (f.parent || "") === id);
+// folderTree lists the folders depth first, with their depth, without the
+// subfolders of those skip returns true for.
+function folderTree(skip = () => false) {
+  const out = [];
+  const walk = (parent, depth) => {
+    for (const f of subfolders(parent)) {
+      out.push({ f, depth });
+      if (!skip(f)) walk(f.id, depth + 1);
+    }
+  };
+  walk("", 0);
+  return out;
+}
+const indent = (depth) => "\u00a0\u00a0\u00a0".repeat(depth);
+const folderOptions = () => folderTree().map(({ f, depth }) => `<option value="${esc(f.id)}">${indent(depth)}${esc(f.name)}</option>`).join("");
 const dateFmt = new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short" });
 const fmtDate = (s) => (s && !s.startsWith("0001") ? dateFmt.format(new Date(s)) : "-");
 const totalSize = (b) => b.media.reduce((n, m) => n + (m.size || 0), 0);
@@ -190,8 +232,8 @@ function inView(b, view = state.view) {
       return b.favorite;
     case "unfiled":
       return !b.folderId;
-    case "folder":
-      return b.folderId === view.id;
+    case "folder": // with its subfolders
+      return isWithin(b.folderId, view.id);
     default:
       return true;
   }
@@ -205,7 +247,7 @@ function visible() {
     if (state.kind && !b.media.some((m) => m.kind === state.kind)) return false;
     if (state.source && sourceOf(b) !== state.source) return false;
     if (!terms.length) return true;
-    const hay = `${b.text} @${b.author} ${b.authorName} ${b.note} ${folderName(b.folderId) ?? ""} ${sources[sourceOf(b)].name}`.toLowerCase();
+    const hay = `${b.text} @${b.author} ${b.authorName} ${b.note} ${folderPath(b.folderId)} ${sources[sourceOf(b)].name}`.toLowerCase();
     return terms.every((t) => hay.includes(t));
   });
   const by = {
@@ -233,32 +275,77 @@ function render() {
   if (state.viewer) renderViewer();
 }
 
-function navLink({ icon, label, count, on, onClick, folderId, onContext }) {
+function navLink({ icon, label, count, on, onClick, folderId, onContext, depth, open }) {
   const a = document.createElement("a");
   a.className = on ? "on" : "";
   a.innerHTML = `${icon}<span class="label">${esc(label)}</span><span class="count">${count}</span>`;
   a.onclick = onClick;
   if (onContext) a.oncontextmenu = (e) => (e.preventDefault(), onContext(e));
-  if (folderId !== undefined) {
-    a.ondragover = (e) => {
-      if (!e.dataTransfer.types.includes("text/x-xdll")) return;
-      e.preventDefault();
-      e.dataTransfer.dropEffect = "move";
-      a.classList.add("drop");
-    };
-    a.ondragleave = () => a.classList.remove("drop");
-    a.ondrop = (e) => {
-      e.preventDefault();
-      a.classList.remove("drop");
-      const ids = JSON.parse(e.dataTransfer.getData("text/x-xdll") || "[]");
-      if (ids.length)
-        run(call("Move", ids, folderId), (s) => {
-          apply(s);
-          toast(`Déplacé dans ${folderName(folderId) ?? "Non classés"}`);
-        });
+  if (depth !== undefined) {
+    // A folder: indented, with a chevron when it has subfolders, and
+    // draggable into another one.
+    a.style.setProperty("--depth", depth);
+    a.classList.add("tree");
+    const chev = document.createElement("button");
+    chev.className = "chev" + (open ? " open" : "");
+    chev.tabIndex = -1;
+    if (open !== undefined) {
+      chev.innerHTML = icons.chevron;
+      chev.title = open ? "Replier" : "Déplier";
+      chev.onclick = (e) => {
+        e.stopPropagation();
+        open ? state.collapsed.add(folderId) : state.collapsed.delete(folderId);
+        saveCollapsed();
+        renderSidebar();
+      };
+    }
+    a.prepend(chev);
+    a.draggable = true;
+    a.ondragstart = (e) => {
+      e.dataTransfer.setData("text/x-xdll-folder", folderId);
+      e.dataTransfer.effectAllowed = "move";
     };
   }
+  if (folderId !== undefined) dropTarget(a, folderId);
   return a;
+}
+
+// dropTarget lets posts be dropped on el to file them in folderId, and
+// folders to put them inside it (at the top level for "").
+function dropTarget(el, folderId, postsToo = true) {
+  const accepts = (e) => {
+    const t = e.dataTransfer.types;
+    return (postsToo && t.includes("text/x-xdll")) || t.includes("text/x-xdll-folder");
+  };
+  el.ondragover = (e) => {
+    if (!accepts(e)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    el.classList.add("drop");
+  };
+  el.ondragleave = () => el.classList.remove("drop");
+  el.ondrop = (e) => {
+    if (!accepts(e)) return;
+    e.preventDefault();
+    el.classList.remove("drop");
+    const where = folderPath(folderId);
+    const folder = e.dataTransfer.getData("text/x-xdll-folder");
+    if (folder) {
+      if (folder === folderId || (folderOf(folder)?.parent || "") === folderId) return;
+      return run(call("MoveFolder", folder, folderId), (s) => {
+        if (state.collapsed.delete(folderId)) saveCollapsed();
+        apply(s);
+        toast(where ? `« ${folderName(folder)} » déplacé dans ${where}` : `« ${folderName(folder)} » remis au premier niveau`);
+      });
+    }
+    if (!postsToo) return;
+    const ids = JSON.parse(e.dataTransfer.getData("text/x-xdll") || "[]");
+    if (ids.length)
+      run(call("Move", ids, folderId), (s) => {
+        apply(s);
+        toast(`Déplacé dans ${where || "Non classés"}`);
+      });
+  };
 }
 
 function setView(view) {
@@ -280,7 +367,7 @@ function renderSidebar() {
   );
   const folders = $("#folders");
   folders.replaceChildren(
-    ...state.folders.map((f) =>
+    ...folderTree((f) => state.collapsed.has(f.id)).map(({ f, depth }) =>
       navLink({
         icon: icons.folder,
         label: f.name,
@@ -289,6 +376,8 @@ function renderSidebar() {
         onClick: () => setView({ type: "folder", id: f.id }),
         folderId: f.id,
         onContext: (e) => folderMenu(f, e.clientX, e.clientY),
+        depth,
+        open: subfolders(f.id).length ? !state.collapsed.has(f.id) : undefined,
       }),
     ),
   );
@@ -297,6 +386,7 @@ function renderSidebar() {
   }
   $("#open-settings").className = state.settings ? "on" : "";
   $("#title").textContent = viewTitle();
+  $("#title").title = v.type === "folder" ? folderPath(v.id) : "";
   const size = state.bookmarks.reduce((s, b) => s + totalSize(b), 0);
   $("#brand-stats").textContent = `${state.bookmarks.length} post${state.bookmarks.length > 1 ? "s" : ""}` + (size ? ` · ${fmtSize(size)}` : "");
 }
@@ -309,18 +399,21 @@ function statsText() {
 
 function folderMenu(f, x, y) {
   openMenu(x, y, [
+    { label: "Nouveau sous-dossier", run: () => newFolder(f.id) },
     { label: "Renommer", run: () => renameFolder(f) },
-    { label: "Exporter", run: () => exportIds(state.bookmarks.filter((b) => b.folderId === f.id).map((b) => b.id)) },
+    { label: "Exporter", run: () => exportIds(state.bookmarks.filter((b) => isWithin(b.folderId, f.id)).map((b) => b.id)) },
+    ...(f.parent ? [{ label: "Remettre au premier niveau", run: () => run(call("MoveFolder", f.id, ""), apply) }] : []),
     "-",
     { label: "Supprimer le dossier", danger: true, run: () => deleteFolder(f) },
   ]);
 }
 
-async function newFolder() {
-  const name = await ask({ title: "Nouveau dossier", value: "", ok: "Créer" });
+async function newFolder(parent = "") {
+  const name = await ask({ title: parent ? "Nouveau sous-dossier" : "Nouveau dossier", text: parent ? `Dans ${folderPath(parent)}` : "", value: "", ok: "Créer" });
   if (name === null) return;
-  const f = await run(call("CreateFolder", name));
+  const f = await run(call("CreateFolder", name, parent));
   if (!f) return;
+  if (state.collapsed.delete(parent)) saveCollapsed();
   if (state.selected.size) await run(call("Move", [...state.selected], f.id), apply);
   else apply(await call("List"));
   setView({ type: "folder", id: f.id });
@@ -333,9 +426,12 @@ async function renameFolder(f) {
 
 async function deleteFolder(f) {
   const count = state.bookmarks.filter((b) => b.folderId === f.id).length;
+  const subs = subfolders(f.id).length;
+  const what = [count && `${count} post${count > 1 ? "s" : ""}`, subs && `${subs} sous-dossier${subs > 1 ? "s" : ""}`].filter(Boolean).join(" et ");
+  const to = f.parent ? `dans ${folderPath(f.parent)}` : !subs ? "dans Non classés" : count ? "au premier niveau (les posts dans Non classés)" : "au premier niveau";
   const ok = await ask({
     title: `Supprimer « ${f.name} » ?`,
-    text: count ? `${count} post(s) iront dans Non classés.` : "",
+    text: what ? `${what} ${count + subs > 1 ? "iront" : "ira"} ${to}.` : "",
     ok: "Supprimer",
     danger: true,
   });
@@ -384,7 +480,7 @@ function renderGrid() {
     const el = document.createElement("div");
     el.className = "card" + (state.selected.has(b.id) ? " selected" : "");
     el.draggable = true;
-    const folder = state.view.type !== "folder" && b.folderId ? folderName(b.folderId) : "";
+    const folder = b.folderId && !(state.view.type === "folder" && b.folderId === state.view.id) ? folderName(b.folderId) : "";
     el.innerHTML = `<div class="thumb">${thumbHTML(b.media[0])}<div class="badges">${badgesHTML(b)}</div>
         <span class="check">${icons.check}</span>
         <button class="star${b.favorite ? " on" : ""}" title="Favori">${b.favorite ? icons.starOn : icons.star}</button></div>
@@ -456,7 +552,7 @@ function cardMenu(b, x, y) {
     { label: "Copier le lien", run: () => copyLinks(ids) },
     "-",
     { label: "Non classés", run: () => run(call("Move", ids, ""), apply) },
-    ...state.folders.map((f) => ({ label: f.name, run: () => run(call("Move", ids, f.id), apply) })),
+    ...folderTree().map(({ f, depth }) => ({ label: indent(depth) + f.name, run: () => run(call("Move", ids, f.id), apply) })),
     "-",
     { label: many ? `Supprimer (${ids.length})` : "Supprimer", danger: true, run: () => deleteIds(ids) },
   ]);
@@ -474,7 +570,7 @@ function renderSelection() {
   $("#selection-count").textContent = `${n} sélectionné${n > 1 ? "s" : ""}`;
   const sel = $("#selection-move");
   sel.innerHTML = `<option value="" disabled selected>Déplacer</option><option value="__none">Non classés</option>` +
-    state.folders.map((f) => `<option value="${esc(f.id)}">${esc(f.name)}</option>`).join("") +
+    folderOptions() +
     `<option value="__new">Nouveau dossier</option>`;
 }
 
@@ -538,7 +634,7 @@ async function add(url) {
   const id = postID(url);
   const dup = state.bookmarks.find((b) => b.id === id);
   if (dup) {
-    const where = dup.folderId ? folderName(dup.folderId) : "Non classés";
+    const where = folderPath(dup.folderId) || "Non classés";
     return toast(`Déjà enregistré : ${dup.authorName || dup.author} sur ${sources[sourceOf(dup)].name} (${where}). Cliquer pour l'ouvrir`, true, () => openViewer([dup.id], 0));
   }
   if (id && state.pending.some((p) => p.id === id && !p.error)) return toast("Déjà en cours de téléchargement", true);
@@ -637,7 +733,7 @@ function renderViewer() {
   $("#v-posted").textContent = fmtDate(b.postedAt);
   $("#v-added").textContent = fmtDate(b.addedAt);
   $("#v-count").textContent = `${v.media + 1} / ${b.media.length} · ${fmtSize(totalSize(b))}` + (m.width ? ` · ${m.width}×${m.height}` : "");
-  $("#v-folder").innerHTML = `<option value="">Non classés</option>` + state.folders.map((f) => `<option value="${esc(f.id)}">${esc(f.name)}</option>`).join("");
+  $("#v-folder").innerHTML = `<option value="">Non classés</option>` + folderOptions();
   $("#v-folder").value = b.folderId || "";
   if (document.activeElement !== $("#v-note")) $("#v-note").value = b.note || "";
   const fav = $("#v-fav");
@@ -947,7 +1043,8 @@ $("#open-data-dir").onclick = () => run(call("OpenDataDir"));
 $("#new-folder").innerHTML = icons.plus;
 $("#add-form").insertAdjacentHTML("afterbegin", icons.link);
 $(".search").insertAdjacentHTML("afterbegin", icons.search);
-$("#new-folder").onclick = newFolder;
+$("#new-folder").onclick = () => newFolder();
+dropTarget($("#folders-head"), "", false);
 $("#search").oninput = (e) => {
   state.search = e.target.value;
   renderGrid();
@@ -990,7 +1087,7 @@ $("#selection-export").onclick = () => exportIds([...state.selected]);
 $("#selection-delete").onclick = () => deleteIds([...state.selected]);
 $("#selection-move").onchange = async (e) => {
   const v = e.target.value;
-  if (v === "__new") return newFolder();
+  if (v === "__new") return newFolder(state.view.type === "folder" ? state.view.id : "");
   await run(call("Move", [...state.selected], v === "__none" ? "" : v), (s) => {
     state.selected.clear();
     apply(s);

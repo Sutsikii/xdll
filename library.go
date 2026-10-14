@@ -45,10 +45,11 @@ type Bookmark struct {
 	Media      []Media   `json:"media"`
 }
 
-// Folder groups bookmarks.
+// Folder groups bookmarks. Folders nest.
 type Folder struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Parent string `json:"parent,omitempty"` // "" at the top level
 }
 
 // Snapshot is the whole library.
@@ -96,6 +97,7 @@ func loadLibrary(dir string) (Snapshot, error) {
 	if err != nil {
 		return data, fmt.Errorf("library.json : %w", err)
 	}
+	data.Folders = cleanFolders(data.Folders)
 	return data, nil
 }
 
@@ -128,7 +130,51 @@ func (l *Library) find(id string) int {
 }
 
 func (l *Library) hasFolder(id string) bool {
-	return id == "" || slices.ContainsFunc(l.data.Folders, func(f Folder) bool { return f.ID == id })
+	return id == "" || l.folder(id) >= 0
+}
+
+func (l *Library) folder(id string) int {
+	return slices.IndexFunc(l.data.Folders, func(f Folder) bool { return f.ID == id })
+}
+
+// newFolderID returns an unused folder ID. The clock alone can repeat:
+// Windows' is coarse. The caller holds l.mu.
+func (l *Library) newFolderID() string {
+	for n := time.Now().UnixNano(); ; n++ {
+		if id := strconv.FormatInt(n, 36); !l.hasFolder(id) {
+			return id
+		}
+	}
+}
+
+// within reports whether folder id is ancestor or inside it.
+func within(folders []Folder, id, ancestor string) bool {
+	for range len(folders) + 1 { // bounded, in case of a cycle
+		if id == ancestor {
+			return true
+		}
+		i := slices.IndexFunc(folders, func(f Folder) bool { return f.ID == id })
+		if i < 0 || folders[i].Parent == "" {
+			return false
+		}
+		id = folders[i].Parent
+	}
+	return false
+}
+
+// cleanFolders puts at the top level the folders whose parent is missing
+// or inside them.
+func cleanFolders(folders []Folder) []Folder {
+	for i, f := range folders {
+		if f.Parent == "" {
+			continue
+		}
+		p := slices.IndexFunc(folders, func(g Folder) bool { return g.ID == f.Parent })
+		if p < 0 || within(folders, f.Parent, f.ID) {
+			folders[i].Parent = ""
+		}
+	}
+	return folders
 }
 
 // update applies fn to a bookmark and saves.
@@ -265,17 +311,35 @@ func (l *Library) SetNote(id, note string) (Snapshot, error) {
 	return l.update(id, func(b *Bookmark) error { b.Note = strings.TrimSpace(note); return nil })
 }
 
-// CreateFolder adds a folder.
-func (l *Library) CreateFolder(name string) (Folder, error) {
+// CreateFolder adds a folder inside parent ("" for the top level).
+func (l *Library) CreateFolder(name, parent string) (Folder, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return Folder{}, errors.New("nom vide")
 	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	f := Folder{ID: strconv.FormatInt(time.Now().UnixNano(), 36), Name: name}
+	if !l.hasFolder(parent) {
+		return Folder{}, errors.New("dossier introuvable")
+	}
+	f := Folder{ID: l.newFolderID(), Name: name, Parent: parent}
 	l.data.Folders = append(l.data.Folders, f)
 	return f, l.save()
+}
+
+// MoveFolder puts a folder inside parent ("" for the top level).
+func (l *Library) MoveFolder(id, parent string) (Snapshot, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	i := l.folder(id)
+	if i < 0 || !l.hasFolder(parent) {
+		return l.snapshot(), errors.New("dossier introuvable")
+	}
+	if parent != "" && within(l.data.Folders, parent, id) {
+		return l.snapshot(), errors.New("un dossier ne peut pas aller dans lui-même")
+	}
+	l.data.Folders[i].Parent = parent
+	return l.snapshot(), l.save()
 }
 
 // RenameFolder renames a folder.
@@ -294,14 +358,25 @@ func (l *Library) RenameFolder(id, name string) (Snapshot, error) {
 	return l.snapshot(), l.save()
 }
 
-// DeleteFolder removes a folder; its bookmarks become unfiled.
+// DeleteFolder removes a folder; its bookmarks and folders go to its
+// parent.
 func (l *Library) DeleteFolder(id string) (Snapshot, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	l.data.Folders = slices.DeleteFunc(l.data.Folders, func(f Folder) bool { return f.ID == id })
+	i := l.folder(id)
+	if i < 0 {
+		return l.snapshot(), nil
+	}
+	parent := l.data.Folders[i].Parent
+	l.data.Folders = slices.Delete(l.data.Folders, i, i+1)
+	for i := range l.data.Folders {
+		if l.data.Folders[i].Parent == id {
+			l.data.Folders[i].Parent = parent
+		}
+	}
 	for i := range l.data.Bookmarks {
 		if l.data.Bookmarks[i].FolderID == id {
-			l.data.Bookmarks[i].FolderID = ""
+			l.data.Bookmarks[i].FolderID = parent
 		}
 	}
 	return l.snapshot(), l.save()

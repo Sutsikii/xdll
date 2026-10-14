@@ -31,7 +31,7 @@ func fakePost(t *testing.T, l *Library, id, folderID string) {
 
 func TestBackupRestore(t *testing.T) {
 	src, _ := OpenLibrary(t.TempDir())
-	f, _ := src.CreateFolder("Art")
+	f, _ := src.CreateFolder("Art", "")
 	fakePost(t, src, "1", f.ID)
 	fakePost(t, src, "2", "")
 	src.SetNote("2", "note")
@@ -43,7 +43,7 @@ func TestBackupRestore(t *testing.T) {
 
 	// Merge into a library that already has post 2 and a folder named "art".
 	dst, _ := OpenLibrary(t.TempDir())
-	art, _ := dst.CreateFolder("art")
+	art, _ := dst.CreateFolder("art", "")
 	fakePost(t, dst, "2", "")
 	fakePost(t, dst, "3", "")
 	res, err := dst.restore(file, false)

@@ -99,7 +99,7 @@ func TestNetworkAdd(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f, _ := l.CreateFolder("Test")
+	f, _ := l.CreateFolder("Test", "")
 	urls := []string{
 		"https://x.com/elonmusk/status/1585341984679469056", // a video
 		"https://x.com/NASAMars/status/2108374638355230914", // a photo

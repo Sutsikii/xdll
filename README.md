@@ -12,7 +12,7 @@ Faite avec [MyGo](https://github.com/egoist/mygo) (Go + WebView2).
 - Instagram : photos, vidéos, carrousels
 - Pinterest : images, vidéos, épingles idées (liens pinterest.com/pin/… et pin.it/…)
 - Le site d'origine est affiché sur chaque post (icône), filtrable dans la barre d'outils
-- Dossiers, favoris, notes
+- Dossiers et sous-dossiers (clic droit → Nouveau sous-dossier, ou glisser un dossier sur un autre), favoris, notes
 - Recherche, filtre par type, tri
 - Sélection multiple, export, suppression
 - Copier pour Claude : texte du post (avec les chemins des fichiers), image, ou les deux

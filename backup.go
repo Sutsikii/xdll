@@ -11,7 +11,6 @@ import (
 	"path"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
@@ -269,26 +268,40 @@ func (l *Library) restore(file string, replace bool) (RestoreResult, error) {
 }
 
 // mergeFolders adds the imported folders, reusing folders with the same
-// name, and maps imported folder IDs to library ones. The caller holds l.mu.
+// name in the same parent, and maps imported folder IDs to library ones.
+// The caller holds l.mu.
 func (l *Library) mergeFolders(in []Folder) map[string]string {
+	in = cleanFolders(slices.Clone(in))
 	ids := map[string]string{"": ""}
-	for _, f := range in {
+	var merge func(f Folder) string
+	merge = func(f Folder) string {
+		if id, ok := ids[f.ID]; ok {
+			return id
+		}
+		parent := ""
+		if p := slices.IndexFunc(in, func(g Folder) bool { return g.ID == f.Parent }); p >= 0 {
+			parent = merge(in[p])
+		}
 		name := strings.TrimSpace(f.Name)
 		if name == "" {
-			continue
+			ids[f.ID] = parent
+			return parent
 		}
-		i := slices.IndexFunc(l.data.Folders, func(g Folder) bool { return strings.EqualFold(g.Name, name) })
+		i := slices.IndexFunc(l.data.Folders, func(g Folder) bool { return g.Parent == parent && strings.EqualFold(g.Name, name) })
 		if i >= 0 {
 			ids[f.ID] = l.data.Folders[i].ID
-			continue
+			return ids[f.ID]
 		}
 		id := f.ID
 		if l.hasFolder(id) { // empty or taken
-
-			id = strconv.FormatInt(time.Now().UnixNano(), 36) + strconv.Itoa(len(l.data.Folders))
+			id = l.newFolderID()
 		}
-		l.data.Folders = append(l.data.Folders, Folder{ID: id, Name: name})
+		l.data.Folders = append(l.data.Folders, Folder{ID: id, Name: name, Parent: parent})
 		ids[f.ID] = id
+		return id
+	}
+	for _, f := range in {
+		merge(f)
 	}
 	return ids
 }
