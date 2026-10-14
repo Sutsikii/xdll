@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.1
+
+- Instagram : les reels que l'app enregistrait comme une image cassée se téléchargent en vraie vidéo, avec la légende, la date du post et une miniature
+- Une image envoyée par un site à la place d'une vidéo n'est plus enregistrée comme vidéo
+
 ## 0.5.0
 
 - Qualité Économie (par défaut) : X en 720p, YouTube en AV1 jusqu'à 1080p, 2 à 4 fois moins de place
