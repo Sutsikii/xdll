@@ -268,11 +268,29 @@ input { user-select: text; }
 .muted { color: var(--muted); }
 
 /* Dialog, menu, toasts */
-.dialog { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; background: rgb(0 0 0 / .35); }
-.dialog-card { width: 380px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 20px 60px rgb(0 0 0 / .3); }
-.dialog-card h2 { margin: 0; font-size: 16px; }
-.dialog-card p { margin: 0; line-height: 1.45; }
-.dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.dialog {
+  position: fixed; inset: 0; z-index: 40; display: grid; place-items: center;
+  background: light-dark(rgb(30 30 28 / .28), rgb(0 0 0 / .55)); backdrop-filter: blur(3px);
+  animation: fade .16s ease;
+}
+.dialog-card {
+  width: 420px; max-width: calc(100vw - 32px); padding: 30px 28px 24px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 24px; box-shadow: var(--shadow-lg);
+  display: flex; flex-direction: column; gap: 10px; text-align: center;
+  animation: pop .2s cubic-bezier(.2, .9, .3, 1.15);
+}
+.dialog-card h2 { margin: 0; font-family: var(--serif); font-size: 25px; font-weight: 600; letter-spacing: -.01em; line-height: 1.2; overflow-wrap: anywhere; }
+.dialog-card p { margin: 0; line-height: 1.5; font-size: 14.5px; overflow-wrap: anywhere; }
+.dialog-card input { height: 44px; margin-top: 8px; border-radius: 12px; font-size: 15px; text-align: left; }
+.dialog-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
+.dialog-actions button { height: 46px; justify-content: center; border-radius: 999px; font-size: 15px; }
+.dialog-actions .ghost { color: var(--text); background: var(--raised); border-color: var(--line-strong); box-shadow: var(--shadow-sm); }
+.dialog-actions .ghost:hover { background: color-mix(in srgb, var(--raised) 94%, var(--text)); }
+.dialog-actions #dialog-ok { order: -1; }
+.dialog-actions .danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+.dialog-actions .danger:hover { background: color-mix(in srgb, var(--danger) 88%, #000); }
+@keyframes fade { from { opacity: 0; } }
+@keyframes pop { from { opacity: 0; transform: translateY(6px) scale(.97); } }
 .settings-page { min-width: 0; min-height: 0; overflow-y: auto; }
 .settings-inner { max-width: 760px; padding: 18px 28px 40px; display: flex; flex-direction: column; gap: 14px; }
 .settings-inner h1 { font-size: 22px; margin: 4px 0 6px; }
@@ -310,17 +328,18 @@ input { user-select: text; }
 .steps { margin: 0; padding-left: 20px; line-height: 1.6; }
 .path { user-select: text; word-break: break-all; font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
 .menu {
-  position: fixed; z-index: 50; min-width: 180px; padding: 5px;
-  background: var(--raised); border: 1px solid var(--line); border-radius: 10px;
-  box-shadow: 0 10px 30px rgb(0 0 0 / .2);
+  position: fixed; z-index: 50; min-width: 200px; max-height: calc(100vh - 16px); overflow-y: auto; padding: 6px;
+  background: var(--raised); border: 1px solid var(--line); border-radius: 14px;
+  box-shadow: var(--shadow-lg); animation: fade .1s ease;
 }
-.menu button { display: flex; width: 100%; border: 0; background: transparent; height: 30px; border-radius: 6px; }
-.menu button:hover { background: var(--accent-soft); }
-.menu hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
-.toasts { position: fixed; right: 18px; bottom: 18px; z-index: 60; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
+.menu button { display: flex; width: 100%; height: 32px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; box-shadow: none; font-weight: 400; }
+.menu button:hover { background: var(--hover); }
+.menu button.danger:hover { background: color-mix(in srgb, var(--danger) 10%, transparent); }
+.menu hr { border: 0; border-top: 1px solid var(--line); margin: 5px 4px; }
+.toasts { position: fixed; right: 20px; bottom: 20px; z-index: 60; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
 .toast {
-  max-width: 420px; padding: 10px 14px; border-radius: 10px;
-  background: var(--text); color: var(--bg); box-shadow: 0 8px 24px rgb(0 0 0 / .2);
+  max-width: 420px; padding: 11px 16px; border-radius: 12px; line-height: 1.4;
+  background: var(--ink); color: var(--on-ink); box-shadow: var(--shadow-lg);
   animation: rise .18s ease;
 }
 .toast.error { background: var(--danger); color: #fff; }
