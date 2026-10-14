@@ -224,6 +224,16 @@ function openMenu(x, y, items) {
 addEventListener("mousedown", (e) => !e.target.closest("#menu") && ($("#menu").hidden = true), true);
 addEventListener("blur", () => ($("#menu").hidden = true));
 
+// The browser's menu (Back, Reload, Print, Inspect) has no place in the app,
+// and Reload stops downloads. Text fields and selected text keep it, for cut,
+// copy and paste.
+addEventListener("contextmenu", (e) => {
+  if (e.defaultPrevented) return;
+  if (e.target.closest("textarea, input:not([type=range], [type=radio], [type=checkbox])")) return;
+  if (String(getSelection()).trim()) return;
+  e.preventDefault();
+});
+
 // --- Filtering and sorting ---------------------------------------------------
 
 function inView(b, view = state.view) {
