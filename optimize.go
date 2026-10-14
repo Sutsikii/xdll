@@ -92,7 +92,7 @@ func (l *Library) heavyPosts() []string {
 }
 
 func heavy(b Bookmark) bool {
-	if b.Source == "instagram" { // a single version
+	if b.Source == "instagram" || b.Source == "pinterest" { // a single version
 		return false
 	}
 	for _, m := range b.Media {

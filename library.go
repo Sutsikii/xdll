@@ -32,7 +32,7 @@ type Media struct {
 // Bookmark is a saved post and its media.
 type Bookmark struct {
 	ID         string    `json:"id"`
-	Source     string    `json:"source,omitempty"` // "x", "youtube" or "instagram"; X when empty (older posts)
+	Source     string    `json:"source,omitempty"` // "x", "youtube", "instagram" or "pinterest"; X when empty (older posts)
 	URL        string    `json:"url"`
 	Author     string    `json:"author"`
 	AuthorName string    `json:"authorName"`
@@ -160,6 +160,10 @@ const (
 
 // Add downloads the media of the post at url into folderID, in quality.
 func (l *Library) Add(ctx context.Context, url, folderID, quality string) (Bookmark, error) {
+	url, err := expandPinIt(ctx, url)
+	if err != nil {
+		return Bookmark{}, err
+	}
 	id, err := parsePostID(url)
 	if err != nil {
 		return Bookmark{}, err

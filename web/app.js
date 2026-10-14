@@ -22,6 +22,7 @@ const icons = {
   play: svg('<path fill="currentColor" d="M7 4v16l13-8z"/>'),
   image: svg('<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/>'),
   gear: svg('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'),
+  pinterest: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0a12 12 0 0 0-4.37 23.17c-.1-.95-.2-2.4.04-3.44l1.4-5.96s-.35-.72-.35-1.78c0-1.67.96-2.91 2.17-2.91 1.02 0 1.52.77 1.52 1.69 0 1.03-.66 2.57-1 4-.28 1.19.6 2.16 1.78 2.16 2.13 0 3.77-2.25 3.77-5.49 0-2.86-2.06-4.87-5-4.87-3.41 0-5.41 2.56-5.41 5.2 0 1.03.4 2.14.89 2.74.1.12.11.22.08.34l-.33 1.37c-.05.22-.18.27-.4.16-1.5-.7-2.44-2.88-2.44-4.65 0-3.77 2.75-7.25 7.92-7.25 4.16 0 7.39 2.97 7.39 6.93 0 4.13-2.6 7.46-6.23 7.46-1.21 0-2.36-.63-2.75-1.38l-.75 2.85c-.27 1.04-1 2.35-1.5 3.15A12 12 0 1 0 12 0z"/></svg>',
   link: svg('<path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1"/>'),
   search: svg('<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>'),
   check: svg('<path d="M20 6 9 17l-5-5"/>', 'stroke-width="3"'),
@@ -35,6 +36,7 @@ const sources = {
   x: { name: "X", icon: icons.x },
   youtube: { name: "YouTube", icon: icons.youtube },
   instagram: { name: "Instagram", icon: icons.instagram },
+  pinterest: { name: "Pinterest", icon: icons.pinterest },
 };
 const sourceOf = (b) => (sources[b.source] ? b.source : "x");
 const sourceIcon = (src) => `<i class="src src-${src}" title="${sources[src].name}">${sources[src].icon}</i>`;
@@ -434,7 +436,7 @@ function renderGrid() {
   if (!cards.length) {
     empty.innerHTML = state.bookmarks.length
       ? `<span class="empty-icon">${icons.search}</span><b>Aucun résultat</b><p>Aucun post ne correspond à ces filtres.</p>`
-      : `<span class="empty-icon">${icons.link}</span><b>Aucun post</b><p>Colle le lien d'un post X, Instagram ou d'une vidéo YouTube avec <kbd>Ctrl</kbd> <kbd>V</kbd>, ou glisse-le ici.</p>`;
+      : `<span class="empty-icon">${icons.link}</span><b>Aucun post</b><p>Colle le lien d'un post X, Instagram, Pinterest ou d'une vidéo YouTube avec <kbd>Ctrl</kbd> <kbd>V</kbd>, ou glisse-le ici.</p>`;
   }
 }
 
@@ -513,18 +515,22 @@ async function deleteIds(ids) {
 
 // --- Adding -------------------------------------------------------------------
 
-// Same as parsePostID in Go: the tweet ID, "yt-" or "ig-" and the site's ID.
+// Same as parsePostID in Go: the tweet ID, "yt-", "ig-" or "pin-" and the site's ID.
 const youtubeID = /(?:youtube\.com\/(?:shorts\/|live\/|embed\/|watch\?(?:[^#]*&)?v=)|youtu\.be\/)([\w-]{11})/i;
 const instagramCode = /instagram\.com\/(?:[\w.]+\/)?(?:p|reels?|tv)\/([\w-]{5,})/i;
-const looksLikePost = (s) => /\/status(es)?\/\d+/i.test(s) || /^\d{6,}$/.test(s.trim()) || youtubeID.test(s) || instagramCode.test(s);
+const pinterestID = /pinterest\.[a-z.]+\/pin\/(?:[^/?#]*--)?(\d{6,20})/i;
+const pinItLink = /^\s*(?:https?:\/\/)?pin\.it\/\w+/i; // resolved by Go
+const looksLikePost = (s) => /\/status(es)?\/\d+/i.test(s) || /^\d{6,}$/.test(s.trim()) || youtubeID.test(s) || instagramCode.test(s) || pinterestID.test(s) || pinItLink.test(s);
 function postID(s) {
   const yt = s.match(youtubeID)?.[1];
   if (yt) return "yt-" + yt;
   const ig = s.match(instagramCode)?.[1];
   if (ig) return "ig-" + ig;
+  const pin = s.match(pinterestID)?.[1];
+  if (pin) return "pin-" + pin;
   return s.match(/\/status(?:es)?\/(\d+)/i)?.[1] ?? (/^\d+$/.test(s) ? s : null);
 }
-const sourceOfID = (id) => (id?.startsWith("yt-") ? "youtube" : id?.startsWith("ig-") ? "instagram" : id ? "x" : "");
+const sourceOfID = (id) => (id?.startsWith("yt-") ? "youtube" : id?.startsWith("ig-") ? "instagram" : id?.startsWith("pin-") ? "pinterest" : id ? "x" : "");
 
 async function add(url) {
   url = url.trim();
@@ -538,7 +544,7 @@ async function add(url) {
   if (id && state.pending.some((p) => p.id === id && !p.error)) return toast("Déjà en cours de téléchargement", true);
   if (state.settings) closeSettings();
   const folderId = state.view.type === "folder" ? state.view.id : "";
-  const p = { key: Math.random(), url, id, source: sourceOfID(id) };
+  const p = { key: Math.random(), url, id, source: pinItLink.test(url) ? "pinterest" : sourceOfID(id) };
   state.pending.unshift(p);
   renderGrid();
   try {
@@ -726,9 +732,9 @@ showQuality();
 
 // --- Lighter library ---
 
-// Videos economy could make lighter: Instagram has a single version.
+// Videos economy could make lighter: Instagram and Pinterest have a single version.
 const heavyVideos = () =>
-  state.bookmarks.filter((b) => sourceOf(b) !== "instagram").flatMap((b) => b.media.filter((m) => m.kind === "video" && !m.light));
+  state.bookmarks.filter((b) => !["instagram", "pinterest"].includes(sourceOf(b))).flatMap((b) => b.media.filter((m) => m.kind === "video" && !m.light));
 
 let optimizing = false;
 

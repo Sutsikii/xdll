@@ -11,14 +11,17 @@ import (
 	"strings"
 )
 
-// parsePostID takes the URL of a post on X, YouTube or Instagram, or a tweet
-// ID, and returns its bookmark ID.
+// parsePostID takes the URL of a post on X, YouTube, Instagram or Pinterest,
+// or a tweet ID, and returns its bookmark ID.
 func parsePostID(s string) (string, error) {
 	if m := youtubeID.FindStringSubmatch(s); m != nil {
 		return "yt-" + m[1], nil
 	}
 	if m := instagramCode.FindStringSubmatch(s); m != nil {
 		return "ig-" + m[1], nil
+	}
+	if m := pinterestID.FindStringSubmatch(s); m != nil {
+		return "pin-" + m[1], nil
 	}
 	return parseTweetID(s)
 }
@@ -32,10 +35,13 @@ func fetchPost(ctx context.Context, id string, economy bool) (*post, error) {
 	if code, ok := strings.CutPrefix(id, "ig-"); ok {
 		return fetchInstagram(ctx, code)
 	}
+	if pin, ok := strings.CutPrefix(id, "pin-"); ok {
+		return fetchPinterest(ctx, pin)
+	}
 	return fetchTweet(ctx, id, economy)
 }
 
-var bookmarkID = regexp.MustCompile(`^(?:[0-9]+|yt-[A-Za-z0-9_-]{11}|ig-[A-Za-z0-9_-]+)$`)
+var bookmarkID = regexp.MustCompile(`^(?:[0-9]+|yt-[A-Za-z0-9_-]{11}|ig-[A-Za-z0-9_-]+|pin-[0-9]+)$`)
 
 // validID reports whether id is a bookmark ID, safe to use as a directory name.
 func validID(id string) bool { return len(id) <= 64 && bookmarkID.MatchString(id) }

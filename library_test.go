@@ -43,6 +43,9 @@ func TestParsePostID(t *testing.T) {
 		"https://www.instagram.com/reel/DWAUs7jANkM/?igsh=abc":        "ig-DWAUs7jANkM",
 		"https://www.instagram.com/reels/DWAUs7jANkM/":                "ig-DWAUs7jANkM",
 		"https://www.instagram.com/natgeo/p/DWAUs7jANkM/?img_index=1": "ig-DWAUs7jANkM",
+		"https://www.pinterest.com/pin/84301824269690044/":            "pin-84301824269690044",
+		"https://fr.pinterest.com/pin/84301824269690044/sent/?a=1":    "pin-84301824269690044",
+		"https://pinterest.co.uk/pin/easy-bread--84301824269690044/":  "pin-84301824269690044",
 	} {
 		got, err := parsePostID(in)
 		if err != nil || got != want {
@@ -52,7 +55,7 @@ func TestParsePostID(t *testing.T) {
 			t.Errorf("validID(%q) = false", got)
 		}
 	}
-	for _, in := range []string{"https://www.youtube.com/@natgeo", "https://www.instagram.com/natgeo/", "..", "yt-../../x", "ig-a/b"} {
+	for _, in := range []string{"https://www.youtube.com/@natgeo", "https://www.instagram.com/natgeo/", "https://www.pinterest.com/natgeo/", "..", "yt-../../x", "ig-a/b", "pin-1/2"} {
 		if id, err := parsePostID(in); err == nil {
 			t.Errorf("parsePostID(%q) = %q", in, id)
 		}
@@ -105,6 +108,9 @@ func TestNetworkAdd(t *testing.T) {
 		"https://www.instagram.com/p/BsOGulcndj-/",          // a photo
 		"https://www.instagram.com/p/DcN0jjHMbqE/",          // a reel InstaFix gives as an image
 		"https://www.instagram.com/p/DePNLTuDHD9/",          // a carousel
+		"https://www.pinterest.com/pin/84301824269690044/",  // a video
+		"https://www.pinterest.com/pin/788411478521134918/", // an idea pin, its video only in HLS
+		"https://www.pinterest.com/pin/182958803596992842/", // an image
 	}
 	for _, u := range urls {
 		b, err := l.Add(context.Background(), u, f.ID, QualityMax)

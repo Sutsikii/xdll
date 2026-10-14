@@ -20,8 +20,8 @@ import (
 
 // post is a post as the public APIs describe it.
 type post struct {
-	ID         string // the bookmark ID: the tweet ID, "yt-" or "ig-" and the site's
-	Source     string // "x", "youtube" or "instagram"
+	ID         string // the bookmark ID: the tweet ID, "yt-", "ig-" or "pin-" and the site's
+	Source     string // "x", "youtube", "instagram" or "pinterest"
 	URL        string
 	Author     string // screen name or handle, without @
 	AuthorName string

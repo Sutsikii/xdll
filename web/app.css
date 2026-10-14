@@ -198,6 +198,7 @@ input { user-select: text; }
 .src-x { color: var(--text); }
 .src-youtube { color: #ff0033; }
 .src-instagram { color: #e1306c; }
+.src-pinterest { color: #e60023; }
 .author .src { margin-right: -1px; }
 #source-filter button { padding: 0 10px; }
 #source-filter button:first-child { padding: 0 12px; }
@@ -320,6 +321,7 @@ input { user-select: text; }
 .usage-bar .src-x { background: var(--text); }
 .usage-bar .src-youtube { background: #ff0033; }
 .usage-bar .src-instagram { background: #e1306c; }
+.usage-bar .src-pinterest { background: #e60023; }
 .usage-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; }
 .usage-legend span { display: inline-flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
 .usage-legend .muted, .usage-legend small { color: var(--muted); font-size: 12px; }

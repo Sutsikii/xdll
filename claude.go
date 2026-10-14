@@ -88,7 +88,7 @@ func (l *Library) clipboardData(b Bookmark, index int, what string) (transfer.Da
 
 func (l *Library) claudeText(b Bookmark) string {
 	var s strings.Builder
-	kind := map[string]string{"youtube": "Vidéo YouTube", "instagram": "Post Instagram"}[b.Source]
+	kind := map[string]string{"youtube": "Vidéo YouTube", "instagram": "Post Instagram", "pinterest": "Épingle Pinterest"}[b.Source]
 	fmt.Fprintf(&s, "%s de %s (@%s)", cmpOr(kind, "Post X"), cmpOr(b.AuthorName, b.Author), b.Author)
 	if !b.PostedAt.IsZero() {
 		fmt.Fprintf(&s, ", %s", b.PostedAt.Local().Format("02/01/2006 15:04"))
