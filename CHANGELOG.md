@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.0
+
+- Épingles Pinterest : images, vidéos et épingles idées, depuis un lien pinterest.com/pin/… ou pin.it/…
+- Pinterest a son filtre dans la barre d'outils et sa couleur dans le stockage
+
 ## 0.6.1
 
 - Les Paramètres prennent toute la largeur de la fenêtre, sur deux ou trois colonnes : beaucoup moins de défilement
