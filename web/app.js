@@ -293,6 +293,8 @@ function renderSidebar() {
   }
   $("#open-settings").className = state.settings ? "on" : "";
   $("#title").textContent = viewTitle();
+  const size = state.bookmarks.reduce((s, b) => s + totalSize(b), 0);
+  $("#brand-stats").textContent = `${state.bookmarks.length} post${state.bookmarks.length > 1 ? "s" : ""}` + (size ? ` · ${fmtSize(size)}` : "");
 }
 
 function statsText() {
