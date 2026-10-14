@@ -299,12 +299,14 @@ input { user-select: text; }
 @keyframes fade { from { opacity: 0; } }
 @keyframes pop { from { opacity: 0; transform: translateY(6px) scale(.97); } }
 .settings-page { min-width: 0; min-height: 0; overflow-y: auto; }
-.settings-inner { max-width: 780px; padding: 26px 32px 48px; display: flex; flex-direction: column; gap: 16px; }
-.settings-inner h1 { font-family: var(--serif); font-size: 30px; font-weight: 600; letter-spacing: -.01em; margin: 0 0 6px; }
+/* Panels flow in as many columns as fit, without being cut. */
+.settings-inner { max-width: 1680px; padding: 26px 32px 32px; columns: 3 440px; column-gap: 16px; }
+.settings-inner h1 { column-span: all; font-family: var(--serif); font-size: 30px; font-weight: 600; letter-spacing: -.01em; margin: 0 0 22px; }
 .panel {
   background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 22px 24px;
   box-shadow: var(--shadow-sm);
   display: flex; flex-direction: column; gap: 12px;
+  break-inside: avoid; margin-bottom: 16px;
 }
 .panel h2 { margin: 0 0 2px; font-size: 15.5px; font-weight: 600; }
 .panel h3 { margin: 10px 0 0; font-size: 13.5px; font-weight: 600; }
