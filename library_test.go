@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -60,6 +62,21 @@ func TestParsePostID(t *testing.T) {
 	}
 }
 
+func TestDownloadImageAsVideo(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/jpeg")
+		w.Write([]byte("\xff\xd8\xff\xe0\x00\x10JFIF"))
+	}))
+	defer srv.Close()
+	dst := filepath.Join(t.TempDir(), "1.mp4")
+	if _, err := downloadMedia(context.Background(), remoteMedia{Kind: "video", URL: srv.URL}, dst); err == nil {
+		t.Fatal("an image was saved as a video")
+	}
+	if _, err := os.Stat(dst); !os.IsNotExist(err) {
+		t.Errorf("left %s: %v", dst, err)
+	}
+}
+
 func TestOriginalPhoto(t *testing.T) {
 	got := originalPhoto("https://pbs.twimg.com/media/FfzVJ1KXkAADnGn.jpg")
 	if want := "https://pbs.twimg.com/media/FfzVJ1KXkAADnGn?format=jpg&name=orig"; got != want {
@@ -97,6 +114,9 @@ func TestNetworkAdd(t *testing.T) {
 			st, err := os.Stat(filepath.Join(l.mediaDir(), m.File))
 			if err != nil || st.Size() < 10_000 {
 				t.Errorf("%s: %v %v", m.File, st, err)
+			}
+			if m.Kind == "video" && !isMP4(filepath.Join(l.mediaDir(), m.File)) {
+				t.Errorf("%s: not an MP4", m.File)
 			}
 			t.Logf("  %s %s %dx%d %d bytes thumb=%s", m.Kind, m.File, m.Width, m.Height, m.Size, m.Thumb)
 		}

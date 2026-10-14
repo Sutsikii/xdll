@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"image"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -41,6 +42,27 @@ func validID(id string) bool { return len(id) <= 64 && bookmarkID.MatchString(id
 
 // downloadMedia downloads m to dst, merging its sound when it comes apart.
 func downloadMedia(ctx context.Context, m remoteMedia, dst string) (int64, error) {
+	n, err := downloadMediaFile(ctx, m, dst)
+	if err == nil && m.Kind != "image" && !isMP4(dst) {
+		os.Remove(dst)
+		return 0, errors.New("le site a envoyé une image à la place de la vidéo")
+	}
+	return n, err
+}
+
+// isMP4 reports whether the file at path starts with an MP4 ftyp box.
+func isMP4(path string) bool {
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+	var head [8]byte
+	_, err = io.ReadFull(f, head[:])
+	return err == nil && string(head[4:]) == "ftyp"
+}
+
+func downloadMediaFile(ctx context.Context, m remoteMedia, dst string) (int64, error) {
 	if m.Audio == "" {
 		return download(ctx, m.URL, dst)
 	}
